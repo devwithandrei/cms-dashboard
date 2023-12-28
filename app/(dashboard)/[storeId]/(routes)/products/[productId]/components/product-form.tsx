@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { toast } from "react-hot-toast"
 import { Trash } from "lucide-react"
-import { Category, Color, Image, Product, Size, Description } from "@prisma/client"
+import { Category, Color, Image, Product, Size, Brand , Description } from "@prisma/client"
 import { useParams, useRouter } from "next/navigation"
 
 import { Input } from "@/components/ui/input"
@@ -35,6 +35,7 @@ const formSchema = z.object({
   categoryId: z.string().min(1),
   colorId: z.string().min(1),
   sizeId: z.string().min(1),
+  brandId: z.string().min(1),
   descriptionId: z.string().min(1),
   isFeatured: z.boolean().default(false).optional(),
   isArchived: z.boolean().default(false).optional()
@@ -49,6 +50,7 @@ interface ProductFormProps {
   categories: Category[];
   colors: Color[];
   sizes: Size[];
+  brands: Brand[];
   descriptions: Description[];
 };
 
@@ -56,6 +58,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   initialData,
   categories,
   sizes,
+  brands,
   descriptions,
   colors
 }) => {
@@ -83,6 +86,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     categoryId: '',
     colorId: '',
     sizeId: '',
+    brandId: '',
     descriptionId: '', // Change null to an empty string here
     isFeatured: false,
     isArchived: false,
@@ -232,6 +236,28 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                     <SelectContent>
                       {sizes.map((size) => (
                         <SelectItem key={size.id} value={size.id}>{size.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="brandId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Brand</FormLabel>
+                  <Select disabled={loading} onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue defaultValue={field.value} placeholder="Select a brand" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {brands.map((brand) => (
+                        <SelectItem key={brand.id} value={brand.id}>{brand.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

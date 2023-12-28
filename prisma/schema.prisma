@@ -17,6 +17,7 @@ model Store {
   categories      Category[]    @relation("StoreToCategory")
   products        Product[]     @relation("StoreToProduct")
   sizes           Size[]        @relation("StoreToSize")
+  brands           Brand[]        @relation("StoreToBrand")
   descriptions    Description[] @relation("StoreToDescription")
   colors          Color[]       @relation("StoreToColor")
   orders          Order[]       @relation("StoreToOrder")
@@ -65,6 +66,8 @@ model Product {
   sizeId            String       // Foreign Key to Size
   descriptionId     String?      // Foreign Key to Description (Nullable)
   size              Size         @relation(fields: [sizeId], references: [id])
+  brandId           String       // Foreign Key to Brand - Define the brandId field
+  brand             Brand        @relation(fields: [brandId], references: [id]) // Define the relation to Brand
   description       Description? @relation(fields: [descriptionId], references: [id])
   colorId           String       // Foreign Key to Color
   color             Color        @relation(fields: [colorId], references: [id])
@@ -78,6 +81,7 @@ model Product {
   @@index([sizeId])
   @@index([colorId])
   @@index([descriptionId])
+  @@index([brandId]) // Include brandId in indexes if required
 }
 
 model Order {
@@ -151,6 +155,19 @@ model Description {
   products    Product[]    // Relation to Product model
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+
+  @@index([storeId])
+}
+
+model Brand {
+  id          String    @id @default(uuid())
+  storeId     String    // Foreign Key to Store
+  store       Store     @relation("StoreToBrand", fields: [storeId], references: [id])
+  name        String
+  value       String
+  products    Product[] // Relation to Product model
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([storeId])
 }
