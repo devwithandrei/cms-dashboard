@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs';
-
 import prismadb from '@/lib/prismadb';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*', // Replace with your frontend domain
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
 
 export async function POST(
   req: Request,
@@ -12,46 +17,46 @@ export async function POST(
 
     const body = await req.json();
 
-    const { name, price, categoryId, colorId, sizeId, brandId,  descriptionId, images, isFeatured, isArchived } = body;
+    const { name, price, categoryId, colorId, sizeId, brandId, descriptionId, images, isFeatured, isArchived } = body;
 
     if (!userId) {
-      return new NextResponse("Unauthenticated", { status: 403 });
+      return new NextResponse("Unauthenticated", { status: 403, headers: corsHeaders });
     }
 
     if (!name) {
-      return new NextResponse("Name is required", { status: 400 });
+      return new NextResponse("Name is required", { status: 400, headers: corsHeaders });
     }
 
     if (!images || !images.length) {
-      return new NextResponse("Images are required", { status: 400 });
+      return new NextResponse("Images are required", { status: 400, headers: corsHeaders });
     }
 
     if (!price) {
-      return new NextResponse("Price is required", { status: 400 });
+      return new NextResponse("Price is required", { status: 400, headers: corsHeaders });
     }
 
     if (!categoryId) {
-      return new NextResponse("Category id is required", { status: 400 });
+      return new NextResponse("Category id is required", { status: 400, headers: corsHeaders });
     }
 
     if (!colorId) {
-      return new NextResponse("Color id is required", { status: 400 });
+      return new NextResponse("Color id is required", { status: 400, headers: corsHeaders });
     }
 
     if (!sizeId) {
-      return new NextResponse("Size id is required", { status: 400 });
+      return new NextResponse("Size id is required", { status: 400, headers: corsHeaders });
     }
 
     if (!brandId) {
-      return new NextResponse("Brand id is required", { status: 400 });
+      return new NextResponse("Brand id is required", { status: 400, headers: corsHeaders });
     }
 
     if (!descriptionId) {
-      return new NextResponse("Description id is required", { status: 400 });
+      return new NextResponse("Description id is required", { status: 400, headers: corsHeaders });
     }
 
     if (!params.storeId) {
-      return new NextResponse("Store id is required", { status: 400 });
+      return new NextResponse("Store id is required", { status: 400, headers: corsHeaders });
     }
 
     const storeByUserId = await prismadb.store.findFirst({
@@ -62,7 +67,7 @@ export async function POST(
     });
 
     if (!storeByUserId) {
-      return new NextResponse("Unauthorized", { status: 405 });
+      return new NextResponse("Unauthorized", { status: 405, headers: corsHeaders });
     }
 
     const product = await prismadb.product.create({
@@ -87,10 +92,10 @@ export async function POST(
       },
     });
   
-    return NextResponse.json(product);
+    return new NextResponse(JSON.stringify(product), { headers: corsHeaders });
   } catch (error) {
     console.log('[PRODUCTS_POST]', error);
-    return new NextResponse("Internal error", { status: 500 });
+    return new NextResponse("Internal error", { status: 500, headers: corsHeaders });
   }
 };
 
@@ -108,7 +113,7 @@ export async function GET(
     const isFeatured = searchParams.get('isFeatured');
 
     if (!params.storeId) {
-      return new NextResponse("Store id is required", { status: 400 });
+      return new NextResponse("Store id is required", { status: 400, headers: corsHeaders });
     }
 
     const products = await prismadb.product.findMany({
@@ -135,9 +140,13 @@ export async function GET(
       }
     });
   
-    return NextResponse.json(products);
+    return new NextResponse(JSON.stringify(products), { headers: corsHeaders });
   } catch (error) {
     console.log('[PRODUCTS_GET]', error);
-    return new NextResponse("Internal error", { status: 500 });
+    return new NextResponse("Internal error", { status: 500, headers: corsHeaders });
   }
 };
+
+export async function OPTIONS() {
+  return new NextResponse(null, { headers: corsHeaders });
+}
