@@ -17,25 +17,34 @@ const ProductsPage = async ({
     },
     include: {
       category: true,
-      size: true,
+      productSizes: {
+        include: {
+          size: true
+        }
+      },
       brand: true,
-      color: true,
+      productColors: {
+        include: {
+          color: true
+        }
+      },
+      images: true
     },
     orderBy: {
       createdAt: 'desc'
     }
   });
 
-  const formattedProducts: ProductColumn[] = products.map((item) => ({
+  const formattedProducts = products.map((item) => ({
     id: item.id,
     name: item.name,
     isFeatured: item.isFeatured,
     isArchived: item.isArchived,
     price: formatter.format(item.price.toNumber()),
     category: item.category.name,
-    size: item.size.name,
     brand: item.brand.name,
-    color: item.color.value,
+    size: item.productSizes[0]?.size?.name || 'N/A',
+    color: item.productColors[0]?.color?.value || 'N/A',
     createdAt: format(item.createdAt, 'MMMM do, yyyy'),
   }));
 

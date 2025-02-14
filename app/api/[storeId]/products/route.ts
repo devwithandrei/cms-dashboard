@@ -1,12 +1,170 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs';
 import prismadb from '@/lib/prismadb';
+import { auth } from '@clerk/nextjs';
+
+interface ProductVariation {
+  sizeId: string;
+  colorId: string;
+  stock: number;
+}
+
+interface ProductRequestBody {
+  name: string;
+  price: number;
+  categoryId: string;
+  brandId: string;
+  variations: ProductVariation[];
+  images: { url: string }[];
+  isFeatured?: boolean;
+  isArchived?: boolean;
+  descriptionId: string;
+}
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*', // Replace with your frontend domain
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
+
+export async function GET(
+  req: Request,
+  { params }: { params: { storeId: string } }
+) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const categoryId = searchParams.get('categoryId') || undefined;
+    const brandId = searchParams.get('brandId') || undefined;
+    const sizeId = searchParams.get('sizeId') || undefined;
+    const colorId = searchParams.get('colorId') || undefined;
+    const isFeatured = searchParams.get('isFeatured');
+
+    if (!params.storeId) {
+      return new NextResponse("Store id is required", { status: 400, headers: corsHeaders });
+    }
+
+    console.log('Fetching products with params:', { categoryId, brandId, sizeId, colorId, isFeatured });
+
+    const products = await prismadb.product.findMany({
+      where: {
+        storeId: params.storeId,
+        categoryId,
+        brandId,
+        isFeatured: isFeatured === 'true' ? true : undefined,
+        isArchived: false,
+        ...(sizeId && {
+          productSizes: {
+            some: {
+              sizeId
+            }
+          }
+        }),
+        ...(colorId && {
+          productColors: {
+            some: {
+              colorId
+            }
+          }
+        })
+      },
+      include: {
+        category: true,
+        brand: true,
+        description: true,
+        images: true,
+        productSizes: {
+          include: {
+            size: true
+          }
+        },
+        productColors: {
+          include: {
+            color: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc',
+      }
+    });
+
+    console.log('Found products:', products.length);
+
+    // Transform the data to match the frontend's expected format
+    const transformedProducts = products.map(product => {
+      console.log(`Processing product ${product.id}:`, {
+        name: product.name,
+        productSizesCount: product.productSizes.length,
+        productColorsCount: product.productColors.length
+      });
+
+      // Map sizes from productSizes
+      const sizes = product.productSizes.map(ps => {
+        console.log('Processing size:', {
+          sizeId: ps.size.id,
+          sizeName: ps.size.name,
+          sizeValue: ps.size.value,
+          stock: ps.stock
+        });
+        return {
+          id: ps.size.id,
+          name: ps.size.name,
+          value: ps.size.value,
+          stock: ps.stock
+        };
+      });
+
+      // Map colors from productColors
+      const colors = product.productColors.map(pc => {
+        console.log('Processing color:', {
+          colorId: pc.color.id,
+          colorName: pc.color.name,
+          colorValue: pc.color.value,
+          stock: pc.stock
+        });
+        return {
+          id: pc.color.id,
+          name: pc.color.name,
+          value: pc.color.value,
+          stock: pc.stock
+        };
+      });
+
+      const transformed = {
+        id: product.id,
+        category: product.category,
+        name: product.name,
+        price: product.price.toString(),
+        isFeatured: product.isFeatured,
+        isArchived: product.isArchived,
+        brand: product.brand,
+        description: product.description,
+        images: product.images,
+        sizes,
+        colors,
+        createdAt: product.createdAt.toISOString(),
+        updatedAt: product.updatedAt.toISOString()
+      };
+
+      console.log(`Transformed product ${product.id}:`, {
+        sizeCount: transformed.sizes.length,
+        colorCount: transformed.colors.length,
+        sizes: transformed.sizes,
+        colors: transformed.colors
+      });
+
+      return transformed;
+    });
+
+    return NextResponse.json(transformedProducts, { headers: corsHeaders });
+  } catch (error) {
+    console.error('[PRODUCTS_GET]', error);
+    return new NextResponse("Internal error", { status: 500, headers: corsHeaders });
+  }
+}
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
 
 export async function POST(
   req: Request,
@@ -14,139 +172,181 @@ export async function POST(
 ) {
   try {
     const { userId } = auth();
-
-    const body = await req.json();
-
-    const { name, price, categoryId, colorId, sizeId, brandId, descriptionId, images, isFeatured, isArchived } = body;
+    const body: ProductRequestBody = await req.json();
 
     if (!userId) {
       return new NextResponse("Unauthenticated", { status: 403, headers: corsHeaders });
     }
 
-    if (!name) {
+    if (!body.name) {
       return new NextResponse("Name is required", { status: 400, headers: corsHeaders });
     }
 
-    if (!images || !images.length) {
+    if (!body.images || !body.images.length) {
       return new NextResponse("Images are required", { status: 400, headers: corsHeaders });
     }
 
-    if (!price) {
+    if (!body.price) {
       return new NextResponse("Price is required", { status: 400, headers: corsHeaders });
     }
 
-    if (!categoryId) {
+    if (!body.categoryId) {
       return new NextResponse("Category id is required", { status: 400, headers: corsHeaders });
     }
 
-    if (!colorId) {
-      return new NextResponse("Color id is required", { status: 400, headers: corsHeaders });
-    }
-
-    if (!sizeId) {
-      return new NextResponse("Size id is required", { status: 400, headers: corsHeaders });
-    }
-
-    if (!brandId) {
+    if (!body.brandId) {
       return new NextResponse("Brand id is required", { status: 400, headers: corsHeaders });
-    }
-
-    if (!descriptionId) {
-      return new NextResponse("Description id is required", { status: 400, headers: corsHeaders });
     }
 
     if (!params.storeId) {
       return new NextResponse("Store id is required", { status: 400, headers: corsHeaders });
     }
 
-    const storeByUserId = await prismadb.store.findFirst({
+    if (!body.variations || !body.variations.length) {
+      return new NextResponse("At least one variation (size/color) is required", { status: 400, headers: corsHeaders });
+    }
+
+    console.log('Creating product with variations:', body.variations);
+
+    const store = await prismadb.store.findFirst({
       where: {
         id: params.storeId,
         userId
       }
     });
 
-    if (!storeByUserId) {
+    if (!store) {
       return new NextResponse("Unauthorized", { status: 405, headers: corsHeaders });
     }
 
+    // Create the product first
     const product = await prismadb.product.create({
       data: {
-        name,
-        price,
-        isFeatured,
-        isArchived,
-        categoryId,
-        colorId,
-        sizeId,
-        brandId,
-        descriptionId,
+        name: body.name,
+        price: body.price,
+        isFeatured: body.isFeatured,
+        isArchived: body.isArchived,
+        categoryId: body.categoryId,
+        brandId: body.brandId,
         storeId: params.storeId,
+        descriptionId: body.descriptionId,
         images: {
           createMany: {
-            data: [
-              ...images.map((image: { url: string }) => image),
-            ],
+            data: body.images.map((image: { url: string }) => image),
           },
         },
       },
     });
-  
-    return new NextResponse(JSON.stringify(product), { headers: corsHeaders });
+
+    console.log('Created product:', product);
+
+    // Create product variations
+    const productSizes = body.variations.map((variation: ProductVariation) => ({
+      productId: product.id,
+      sizeId: variation.sizeId,
+      stock: variation.stock,
+    }));
+
+    const productColors = body.variations.map((variation: ProductVariation) => ({
+      productId: product.id,
+      colorId: variation.colorId,
+      stock: variation.stock,
+    }));
+
+    console.log('Creating sizes:', productSizes);
+    console.log('Creating colors:', productColors);
+
+    // Create sizes and colors in parallel
+    await Promise.all([
+      prismadb.productSize.createMany({
+        data: productSizes
+      }),
+      prismadb.productColor.createMany({
+        data: productColors
+      })
+    ]);
+
+    // Fetch the complete product with all relations
+    const completeProduct = await prismadb.product.findUnique({
+      where: { id: product.id },
+      include: {
+        category: true,
+        brand: true,
+        description: true,
+        images: true,
+        productSizes: {
+          include: {
+            size: true
+          }
+        },
+        productColors: {
+          include: {
+            color: true
+          }
+        }
+      }
+    });
+
+    if (!completeProduct) {
+      throw new Error("Failed to fetch complete product after creation");
+    }
+
+    console.log('Complete product:', {
+      id: completeProduct.id,
+      sizeCount: completeProduct.productSizes.length,
+      colorCount: completeProduct.productColors.length,
+      sizes: completeProduct.productSizes.map(ps => ({
+        id: ps.size.id,
+        name: ps.size.name,
+        value: ps.size.value,
+        stock: ps.stock
+      })),
+      colors: completeProduct.productColors.map(pc => ({
+        id: pc.color.id,
+        name: pc.color.name,
+        value: pc.color.value,
+        stock: pc.stock
+      }))
+    });
+
+    // Transform the response to match the GET endpoint format
+    const transformedProduct = {
+      id: completeProduct.id,
+      category: completeProduct.category,
+      name: completeProduct.name,
+      price: completeProduct.price.toString(),
+      isFeatured: completeProduct.isFeatured,
+      isArchived: completeProduct.isArchived,
+      brand: completeProduct.brand,
+      description: completeProduct.description,
+      images: completeProduct.images,
+      sizes: completeProduct.productSizes.map(ps => ({
+        id: ps.size.id,
+        name: ps.size.name,
+        value: ps.size.value,
+        stock: ps.stock
+      })),
+      colors: completeProduct.productColors.map(pc => ({
+        id: pc.color.id,
+        name: pc.color.name,
+        value: pc.color.value,
+        stock: pc.stock
+      })),
+      createdAt: completeProduct.createdAt.toISOString(),
+      updatedAt: completeProduct.updatedAt.toISOString()
+    };
+
+    console.log('Transformed product:', {
+      id: transformedProduct.id,
+      sizeCount: transformedProduct.sizes.length,
+      colorCount: transformedProduct.colors.length,
+      sizes: transformedProduct.sizes,
+      colors: transformedProduct.colors
+    });
+
+    return NextResponse.json(transformedProduct, { headers: corsHeaders });
   } catch (error) {
     console.log('[PRODUCTS_POST]', error);
     return new NextResponse("Internal error", { status: 500, headers: corsHeaders });
   }
 };
-
-export async function GET(
-  req: Request,
-  { params }: { params: { storeId: string } },
-) {
-  try {
-    const { searchParams } = new URL(req.url)
-    const categoryId = searchParams.get('categoryId') || undefined;
-    const colorId = searchParams.get('colorId') || undefined;
-    const sizeId = searchParams.get('sizeId') || undefined;
-    const brandId = searchParams.get('brandId') || undefined;
-    const descriptionId = searchParams.get('descriptionId') || undefined;
-    const isFeatured = searchParams.get('isFeatured');
-
-    if (!params.storeId) {
-      return new NextResponse("Store id is required", { status: 400, headers: corsHeaders });
-    }
-
-    const products = await prismadb.product.findMany({
-      where: {
-        storeId: params.storeId,
-        categoryId,
-        colorId,
-        sizeId,
-        brandId,
-        descriptionId,
-        isFeatured: isFeatured ? true : undefined,
-        isArchived: false,
-      },
-      include: {
-        images: true,
-        category: true,
-        color: true,
-        size: true,
-        brand: true,
-        description: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      }
-    });
-  
-    return new NextResponse(JSON.stringify(products), { headers: corsHeaders });
-  } catch (error) {
-    console.log('[PRODUCTS_GET]', error);
-    return new NextResponse("Internal error", { status: 500, headers: corsHeaders });
-  }
-};
-
-export async function OPTIONS() {
-  return new NextResponse(null, { headers: corsHeaders });
-}

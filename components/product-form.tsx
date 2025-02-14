@@ -1,18 +1,15 @@
-"use client"
+'use client';
 
-import * as z from "zod"
-import axios from "axios"
-import { useState } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { useForm } from "react-hook-form"
-import { toast } from "react-hot-toast"
-import { Trash, Plus, X } from "lucide-react"
-import { Category, Color, Image, Product, Size, Brand, Description, ProductSize, ProductColor } from "@prisma/client"
-import { useParams, useRouter } from "next/navigation"
-import { CheckedState } from "@radix-ui/react-checkbox"
-
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
+import * as z from 'zod';
+import { useState } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import { toast } from 'react-hot-toast';
+import { Trash } from 'lucide-react';
+import { Category, Size, Color, Product, Brand, Description } from '@/types';
+import { Button } from '@/components/ui/button';
+import { Heading } from '@/components/ui/heading';
+import { Separator } from '@/components/ui/separator';
 import {
   Form,
   FormControl,
@@ -21,14 +18,21 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form"
-import { Separator } from "@/components/ui/separator"
-import { Heading } from "@/components/ui/heading"
-import { AlertModal } from "@/components/modals/alert-modal"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import ImageUpload from "@/components/ui/image-upload"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Badge } from "@/components/ui/badge"
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import ImageUpload from '@/components/ui/image-upload';
+import { AlertModal } from '@/components/modals/alert-modal';
+import ProductVariationsForm from '@/components/product-variations-form';
+import axios from 'axios';
+import { useParams, useRouter } from 'next/navigation';
 
 const formSchema = z.object({
   name: z.string().min(1),
@@ -36,44 +40,40 @@ const formSchema = z.object({
   price: z.coerce.number().min(1),
   categoryId: z.string().min(1),
   brandId: z.string().min(1),
-  descriptionId: z.string().min(1),
+  descriptionId: z.string().optional(),
   isFeatured: z.boolean().default(false).optional(),
   isArchived: z.boolean().default(false).optional(),
   variations: z.array(z.object({
-    sizeId: z.string().min(1),
-    colorId: z.string().min(1),
-    stock: z.coerce.number().min(0)
+    sizeId: z.string().min(1, "Size is required"),
+    colorId: z.string().min(1, "Color is required"),
+    stock: z.number().min(0, "Stock must be 0 or greater")
   }))
 });
 
-type ProductFormValues = z.infer<typeof formSchema>
+type ProductFormValues = z.infer<typeof formSchema>;
 
 interface ProductFormProps {
-  initialData: Product & {
-    images: Image[]
-    productSizes: (ProductSize & { size: Size })[]
-    productColors: (ProductColor & { color: Color })[]
-  } | null;
+  initialData: Product | null;
   categories: Category[];
-  colors: Color[];
   sizes: Size[];
+  colors: Color[];
   brands: Brand[];
   descriptions: Description[];
-};
+}
 
 export const ProductForm: React.FC<ProductFormProps> = ({
   initialData,
   categories,
   sizes,
+  colors,
   brands,
   descriptions,
-  colors
 }) => {
-  const params = useParams();
-  const router = useRouter();
-
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const params = useParams();
+  const router = useRouter();
 
   const title = initialData ? 'Edit product' : 'Create product';
   const description = initialData ? 'Edit a product.' : 'Add a new product';
@@ -81,15 +81,18 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   const action = initialData ? 'Save changes' : 'Create';
 
   const defaultValues = initialData ? {
-    ...initialData,
+    name: initialData.name,
+    images: initialData.images,
     price: parseFloat(String(initialData?.price)),
-    descriptionId: initialData?.descriptionId || '',
-    isFeatured: initialData?.isFeatured || false,
-    isArchived: initialData?.isArchived || false,
-    variations: initialData.productSizes.map((ps, index) => ({
-      sizeId: ps.sizeId,
+    categoryId: initialData.categoryId,
+    brandId: initialData.brandId,
+    descriptionId: initialData.descriptionId,
+    isFeatured: initialData.isFeatured,
+    isArchived: initialData.isArchived,
+    variations: initialData.productSizes.map((size, index) => ({
+      sizeId: size.sizeId,
       colorId: initialData.productColors[index]?.colorId || '',
-      stock: ps.stock
+      stock: size.stock
     }))
   } : {
     name: '',
@@ -100,12 +103,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     descriptionId: '',
     isFeatured: false,
     isArchived: false,
-    variations: [{
-      sizeId: '',
-      colorId: '',
-      stock: 0
-    }]
-  }
+    variations: []
+  };
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(formSchema),
@@ -115,17 +114,31 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   const onSubmit = async (data: ProductFormValues) => {
     try {
       setLoading(true);
+
       if (initialData) {
-        await axios.patch(`/api/${params.storeId}/products/${params.productId}`, data);
+        await axios.patch(`/api/${params.storeId}/products/${params.productId}`, {
+          ...data,
+          variations: data.variations.map(v => ({
+            sizeId: v.sizeId,
+            colorId: v.colorId,
+            stock: v.stock
+          }))
+        });
       } else {
-        const response = await axios.post(`/api/${params.storeId}/products`, data);
-        console.log('Created product:', response.data);
+        await axios.post(`/api/${params.storeId}/products`, {
+          ...data,
+          variations: data.variations.map(v => ({
+            sizeId: v.sizeId,
+            colorId: v.colorId,
+            stock: v.stock
+          }))
+        });
       }
+
       router.refresh();
       router.push(`/${params.storeId}/products`);
       toast.success(toastMessage);
     } catch (error: any) {
-      console.error('Error creating/updating product:', error.response?.data || error);
       toast.error('Something went wrong.');
     } finally {
       setLoading(false);
@@ -145,27 +158,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       setLoading(false);
       setOpen(false);
     }
-  }
-
-  const addVariation = () => {
-    const currentVariations = form.getValues('variations');
-    form.setValue('variations', [
-      ...currentVariations,
-      { sizeId: '', colorId: '', stock: 0 }
-    ]);
-  };
-
-  const removeVariation = (index: number) => {
-    const currentVariations = form.getValues('variations');
-    if (currentVariations.length > 1) {
-      form.setValue('variations', currentVariations.filter((_, i) => i !== index));
-    } else {
-      toast.error('At least one variation is required');
-    }
-  };
-
-  const handleCheckboxChange = (field: any, checked: CheckedState) => {
-    field.onChange(checked === true);
   };
 
   return (
@@ -251,7 +243,9 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                     </FormControl>
                     <SelectContent>
                       {categories.map((category) => (
-                        <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -273,7 +267,9 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                     </FormControl>
                     <SelectContent>
                       {brands.map((brand) => (
-                        <SelectItem key={brand.id} value={brand.id}>{brand.name}</SelectItem>
+                        <SelectItem key={brand.id} value={brand.id}>
+                          {brand.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -295,7 +291,9 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                     </FormControl>
                     <SelectContent>
                       {descriptions.map((description) => (
-                        <SelectItem key={description.id} value={description.id}>{description.name}</SelectItem>
+                        <SelectItem key={description.id} value={description.id}>
+                          {description.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -303,117 +301,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 </FormItem>
               )}
             />
-          </div>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Heading title="Variations" description="Add size and color variations with stock levels" />
-              <Button 
-                type="button" 
-                onClick={addVariation} 
-                className="text-xs md:text-sm text-gray-600 dark:text-gray-300"
-              >
-                Add Variation
-              </Button>
-            </div>
-            <div className="space-y-4">
-              {form.watch('variations').map((_, index) => (
-                <div key={index} className="flex flex-col space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="relative">
-                      <FormField
-                        control={form.control}
-                        name={`variations.${index}.sizeId`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Size</FormLabel>
-                            <Select 
-                              disabled={loading} 
-                              onValueChange={field.onChange} 
-                              value={field.value} 
-                              defaultValue={field.value}
-                            >
-                              <FormControl>
-                                <SelectTrigger className="w-full">
-                                  <SelectValue defaultValue={field.value} placeholder="Select a size" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {sizes.map((size) => (
-                                  <SelectItem key={size.id} value={size.id}>{size.name}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    <div className="relative">
-                      <FormField
-                        control={form.control}
-                        name={`variations.${index}.colorId`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Color</FormLabel>
-                            <Select 
-                              disabled={loading} 
-                              onValueChange={field.onChange} 
-                              value={field.value} 
-                              defaultValue={field.value}
-                            >
-                              <FormControl>
-                                <SelectTrigger className="w-full">
-                                  <SelectValue defaultValue={field.value} placeholder="Select a color" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {colors.map((color) => (
-                                  <SelectItem key={color.id} value={color.id}>{color.name}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    <div className="relative">
-                      <FormField
-                        control={form.control}
-                        name={`variations.${index}.stock`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Stock</FormLabel>
-                            <FormControl>
-                              <Input 
-                                type="number" 
-                                disabled={loading} 
-                                placeholder="0" 
-                                {...field} 
-                                className="w-full"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  </div>
-                  <Button 
-                    type="button" 
-                    variant="destructive" 
-                    size="sm"
-                    onClick={() => removeVariation(index)}
-                    className="ml-auto"
-                  >
-                    Remove Variation
-                  </Button>
-                  <Separator className="my-4" />
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="md:grid md:grid-cols-3 gap-8">
             <FormField
               control={form.control}
               name="isFeatured"
@@ -422,7 +309,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                   <FormControl>
                     <Checkbox
                       checked={field.value}
-                      onCheckedChange={(checked) => handleCheckboxChange(field, checked)}
+                      onCheckedChange={(checked) => field.onChange(!!checked)}
                     />
                   </FormControl>
                   <div className="space-y-1 leading-none">
@@ -444,7 +331,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                   <FormControl>
                     <Checkbox
                       checked={field.value}
-                      onCheckedChange={(checked) => handleCheckboxChange(field, checked)}
+                      onCheckedChange={(checked) => field.onChange(!!checked)}
                     />
                   </FormControl>
                   <div className="space-y-1 leading-none">
@@ -458,7 +345,26 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="variations"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Product Variations</FormLabel>
+                  <FormControl>
+                    <ProductVariationsForm
+                      sizes={sizes}
+                      colors={colors}
+                      existingVariations={field.value}
+                      onVariationsChange={field.onChange}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
+          <Separator />
           <Button disabled={loading} className="ml-auto" type="submit">
             {action}
           </Button>
@@ -466,6 +372,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       </Form>
     </>
   );
-}
+};
 
 export default ProductForm;

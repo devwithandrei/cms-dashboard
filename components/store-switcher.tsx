@@ -44,7 +44,9 @@ export default function StoreSwitcher({ className, items = [] }: StoreSwitcherPr
 
   const onStoreSelect = (store: { value: string, label: string }) => {
     setOpen(false);
-    router.push(`/${store.value}`);
+    if (params.storeId !== store.value) {
+      router.push(`/${store.value}`);
+    }
   };
 
   return (

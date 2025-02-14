@@ -4,6 +4,22 @@ import { auth } from '@clerk/nextjs';
 import Navbar from '@/components/navbar'
 import prismadb from '@/lib/prismadb';
 
+async function getStore(storeId: string, userId: string) {
+  try {
+    const store = await prismadb.store.findFirst({ 
+      where: {
+        id: storeId,
+        userId,
+      }
+    });
+
+    return store;
+  } catch (error) {
+    console.error('Error fetching store:', error);
+    return null;
+  }
+}
+
 export default async function DashboardLayout({
   children,
   params
@@ -17,16 +33,11 @@ export default async function DashboardLayout({
     redirect('/sign-in');
   }
 
-  const store = await prismadb.store.findFirst({ 
-    where: {
-      id: params.storeId,
-      userId,
-    }
-   });
+  const store = await getStore(params.storeId, userId);
 
   if (!store) {
     redirect('/');
-  };
+  }
 
   return (
     <>
@@ -34,4 +45,4 @@ export default async function DashboardLayout({
       {children}
     </>
   );
-};
+}
