@@ -35,7 +35,18 @@ const ProductsPage = async ({
     }
   });
 
-  const formattedProducts = products.map((item) => ({
+  const formattedProducts = products.map((item: { 
+    id: string; 
+    name: string; 
+    price: { toNumber: () => number }; 
+    category: { name: string }; 
+    brand: { name: string }; 
+    productSizes: { size: { name: string }, stock: number }[]; 
+    productColors: { color: { name: string, value: string } }[]; 
+    createdAt: Date; 
+    isFeatured: boolean; 
+    isArchived: boolean 
+  }) => ({
     id: item.id,
     name: item.name,
     isFeatured: item.isFeatured,
@@ -43,8 +54,9 @@ const ProductsPage = async ({
     price: formatter.format(item.price.toNumber()),
     category: item.category.name,
     brand: item.brand.name,
-    size: item.productSizes[0]?.size?.name || 'N/A',
-    color: item.productColors[0]?.color?.value || 'N/A',
+    size: item.productSizes.map((ps: { size: { name: string } }) => ps.size.name).join(', '),
+    color: item.productColors.map((pc: { color: { name: string } }) => pc.color.name).join(', '),
+    stock: item.productSizes.reduce((total, variation) => total + variation.stock, 0),
     createdAt: format(item.createdAt, 'MMMM do, yyyy'),
   }));
 

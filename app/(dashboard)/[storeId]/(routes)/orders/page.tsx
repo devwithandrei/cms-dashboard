@@ -1,52 +1,38 @@
-import { format } from "date-fns";
+"use client";
+import { useRouter } from "next/navigation";
+import useSWR from 'swr';
+import { toast } from "react-toastify";
+import { OrderColumn } from "./components/columns";
+import OrdersClient from "./OrdersClient";
+import { useParams } from "next/navigation";
 
-import prismadb from "@/lib/prismadb";
-import { formatter } from "@/lib/utils";
+const fetcher = (url: string) => fetch(url).then(res => res.json());
 
-import { OrderColumn } from "./components/columns"
-import { OrderClient } from "./components/client";
+const OrdersPage = () => {
+  const params = useParams();
+  const storeId = params?.storeId as string;
+  const router = useRouter();
+  const { data: orders, error, isLoading } = useSWR<OrderColumn[], Error>(storeId ? `/api/${storeId}/orders` : null, fetcher);
 
+  if (!storeId) {
+    return <div>Store ID not found</div>;
+  }
 
-const OrdersPage = async ({
-  params
-}: {
-  params: { storeId: string }
-}) => {
-  const orders = await prismadb.order.findMany({
-    where: {
-      storeId: params.storeId
-    },
-    include: {
-      orderItems: {
-        include: {
-          product: true
-        }
-      }
-    },
-    orderBy: {
-      createdAt: 'desc'
-    }
-  });
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
 
-  const formattedOrders: OrderColumn[] = orders.map((item) => ({
-    id: item.id,
-    phone: item.phone,
-    address: item.address,
-    products: item.orderItems.map((orderItem) => orderItem.product.name).join(', '),
-    totalPrice: formatter.format(item.orderItems.reduce((total, item) => {
-      return total + Number(item.product.price)
-    }, 0)),
-    isPaid: item.isPaid,
-    createdAt: format(item.createdAt, 'MMMM do, yyyy'),
-  }));
+  if (error) {
+    toast.error("Failed to fetch orders");
+    return <div>Error loading orders</div>;
+  }
 
   return (
-    <div className="flex-col">
-      <div className="flex-1 space-y-4 p-8 pt-6">
-        <OrderClient data={formattedOrders} />
-      </div>
+    <div className="flex bg-white dark:bg-gray-800">
+      <OrdersClient orders={orders || []} storeId={storeId} />
     </div>
   );
 };
+
 
 export default OrdersPage;

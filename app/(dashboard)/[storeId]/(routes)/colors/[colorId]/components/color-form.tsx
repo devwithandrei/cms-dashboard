@@ -61,14 +61,22 @@ export const ColorForm: React.FC<ColorFormProps> = ({
   const onSubmit = async (data: ColorFormValues) => {
     try {
       setLoading(true);
-      if (initialData) {
-        await axios.patch(`/api/${params.storeId}/colors/${params.colorId}`, data);
+      if (params && params.storeId && params.colorId) {
+        if (initialData) {
+          await axios.patch(`/api/${params.storeId}/colors/${params.colorId}`, data);
+        } else {
+          await axios.post(`/api/${params.storeId}/colors`, data);
+        }
+        router.refresh();
+        if (params && params.storeId) {
+          router.push(`/${params.storeId}/colors`);
+        } else {
+          toast.error('Store ID not found.');
+        }
+        toast.success(toastMessage);
       } else {
-        await axios.post(`/api/${params.storeId}/colors`, data);
+        toast.error('Store ID or Color ID not found.');
       }
-      router.refresh();
-      router.push(`/${params.storeId}/colors`);
-      toast.success(toastMessage);
     } catch (error: any) {
       toast.error('Something went wrong.');
     } finally {
@@ -79,10 +87,18 @@ export const ColorForm: React.FC<ColorFormProps> = ({
   const onDelete = async () => {
     try {
       setLoading(true);
-      await axios.delete(`/api/${params.storeId}/colors/${params.colorId}`);
-      router.refresh();
-      router.push(`/${params.storeId}/colors`);
-      toast.success('Color deleted.');
+      if (params && params.storeId && params.colorId) {
+        await axios.delete(`/api/${params.storeId}/colors/${params.colorId}`);
+        router.refresh();
+        if (params && params.storeId) {
+          router.push(`/${params.storeId}/colors`);
+        } else {
+          toast.error('Store ID not found.');
+        }
+        toast.success('Color deleted.');
+      } else {
+        toast.error('Store ID or Color ID not found.');
+      }
     } catch (error: any) {
       toast.error('Make sure you removed all products using this color first.');
     } finally {

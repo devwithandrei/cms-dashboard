@@ -1,3 +1,7 @@
+/* eslint-disable import/named */
+
+/* eslint-disable import/named */
+
 "use client";
 
 import axios from "axios";
@@ -33,10 +37,14 @@ export const CellAction: React.FC<CellActionProps> = ({
   const onConfirm = async () => {
     try {
       setLoading(true);
+      if (!params?.storeId) {
+        toast.error('Store ID is not available.');
+        return;
+      }
       await axios.delete(`/api/${params.storeId}/descriptions/${data.id}`);
       toast.success('Description deleted.');
       router.refresh();
-    } catch (error) {
+    } catch (error: any) {
       toast.error('Make sure you removed all products using this Description first.');
     } finally {
       setOpen(false);
@@ -72,7 +80,7 @@ export const CellAction: React.FC<CellActionProps> = ({
             <Copy className="mr-2 h-4 w-4" /> Copy Id
           </DropdownMenuItem>
           <DropdownMenuItem
-            onClick={() => router.push(`/${params.storeId}/descriptions/${data.id}`)}
+            onClick={() => router.push(`/${params?.storeId}/descriptions/${data.id}`)}
           >
             <Edit className="mr-2 h-4 w-4" /> Update
           </DropdownMenuItem>

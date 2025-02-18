@@ -59,13 +59,25 @@ export const DescriptionForm: React.FC<DescriptionFormProps> = ({
   const onSubmit = async (data: DescriptionFormValues) => {
     try {
       setLoading(true);
+      if (!params || !params.storeId || !params.descriptionId) {
+        toast.error('Store ID or Description ID is not available.');
+        return; // Handle the case appropriately
+    }
       if (initialData) {
         await axios.patch(`/api/${params.storeId}/descriptions/${params.descriptionId}`, data);
       } else {
+        if (!params || !params.storeId) {
+          toast.error('Store ID is not available.');
+          return;
+        }
         await axios.post(`/api/${params.storeId}/descriptions`, data);
       }
       router.refresh();
-      router.push(`/${params.storeId}/descriptions`);
+      if (params && params.storeId) {
+        router.push(`/${params.storeId}/descriptions`);
+      } else {
+        toast.error('Store ID not found.');
+      }
       toast.success(toastMessage);
     } catch (error: any) {
       toast.error('Something went wrong.');
@@ -77,9 +89,17 @@ export const DescriptionForm: React.FC<DescriptionFormProps> = ({
   const onDelete = async () => {
     try {
       setLoading(true);
+      if (!params || !params.storeId || !params.descriptionId) {
+        toast.error('Store ID or Description ID is not available.');
+        return;
+      }
       await axios.delete(`/api/${params.storeId}/descriptions/${params.descriptionId}`);
       router.refresh();
-      router.push(`/${params.storeId}/descriptions`);
+      if (params && params.storeId) {
+        router.push(`/${params.storeId}/descriptions`);
+      } else {
+        toast.error('Store ID not found.');
+      }
       toast.success('Description deleted.');
     } catch (error: any) {
       toast.error('Make sure you removed all products using this Description first.');

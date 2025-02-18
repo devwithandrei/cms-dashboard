@@ -25,14 +25,14 @@ interface ProductVariationsFormProps {
   sizes: Size[];
   colors: Color[];
   existingVariations?: ProductVariation[];
-  onVariationsChange: (variations: ProductVariation[]) => void;
+  onVariationsChangeAction: (variations: ProductVariation[]) => void;
 }
 
 export const ProductVariationsForm: React.FC<ProductVariationsFormProps> = ({
   sizes,
   colors,
   existingVariations = [],
-  onVariationsChange,
+  onVariationsChangeAction,
 }) => {
   const [variations, setVariations] = useState<ProductVariation[]>(existingVariations);
 
@@ -41,7 +41,7 @@ export const ProductVariationsForm: React.FC<ProductVariationsFormProps> = ({
       ...prev,
       { sizeId: '', colorId: '', stock: 0 }
     ]);
-    onVariationsChange([...variations, { sizeId: '', colorId: '', stock: 0 }]);
+    onVariationsChangeAction([...variations, { sizeId: '', colorId: '', stock: 0 }]);
   };
 
   const updateVariation = (index: number, field: keyof ProductVariation, value: string | number) => {
@@ -56,13 +56,13 @@ export const ProductVariationsForm: React.FC<ProductVariationsFormProps> = ({
     });
     
     setVariations(updatedVariations);
-    onVariationsChange(updatedVariations);
+    onVariationsChangeAction(updatedVariations);
   };
 
   const removeVariation = (index: number) => {
     const updatedVariations = variations.filter((_, i) => i !== index);
     setVariations(updatedVariations);
-    onVariationsChange(updatedVariations);
+    onVariationsChangeAction(updatedVariations);
   };
 
   return (
@@ -140,6 +140,16 @@ export const ProductVariationsForm: React.FC<ProductVariationsFormProps> = ({
               </div>
             </div>
           </Card>
+        ))}
+      </div>
+      <div>
+        {variations.map((variation, index) => (
+          <div key={index} className="variation-item">
+            <span>Size: {sizes.find(size => size.id === variation.sizeId)?.name}</span>
+            <span>Color: {colors.find(color => color.id === variation.colorId)?.name}</span>
+            <span>Stock: {variation.stock}</span>
+            <span>Selected Variation: {sizes.find(size => size.id === variation.sizeId)?.name} - {colors.find(color => color.id === variation.colorId)?.name} - Stock: {variation.stock}</span>
+          </div>
         ))}
       </div>
     </div>

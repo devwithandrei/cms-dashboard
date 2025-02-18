@@ -31,12 +31,16 @@ export const CellAction: React.FC<CellActionProps> = ({
   const [loading, setLoading] = useState(false);
 
   const onConfirm = async () => {
+    if (!params?.storeId) {
+      toast.error('Store ID not found!');
+      return;
+    }
     try {
       setLoading(true);
       await axios.delete(`/api/${params.storeId}/sizes/${data.id}`);
       toast.success('Size deleted.');
       router.refresh();
-    } catch (error) {
+    } catch (error: any) {
       toast.error('Make sure you removed all products using this size first.');
     } finally {
       setOpen(false);
@@ -72,7 +76,13 @@ export const CellAction: React.FC<CellActionProps> = ({
             <Copy className="mr-2 h-4 w-4" /> Copy Id
           </DropdownMenuItem>
           <DropdownMenuItem
-            onClick={() => router.push(`/${params.storeId}/sizes/${data.id}`)}
+            onClick={() => {
+              if (!params?.storeId) {
+                toast.error('Store ID not found!');
+                return;
+              }
+              router.push(`/${params.storeId}/sizes/${data.id}`);
+            }}
           >
             <Edit className="mr-2 h-4 w-4" /> Update
           </DropdownMenuItem>

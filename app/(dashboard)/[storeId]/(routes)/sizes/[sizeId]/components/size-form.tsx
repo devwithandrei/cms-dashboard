@@ -52,11 +52,16 @@ export const SizeForm: React.FC<SizeFormProps> = ({
   const form = useForm<SizeFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: initialData || {
-      name: ''
+      name: '',
+      value: ''
     }
   });
 
   const onSubmit = async (data: SizeFormValues) => {
+    if (!params?.storeId || !params?.sizeId) {
+      toast.error('Store ID or Size ID is not available.');
+      return;
+    }
     try {
       setLoading(true);
       if (initialData) {
@@ -75,6 +80,10 @@ export const SizeForm: React.FC<SizeFormProps> = ({
   };
 
   const onDelete = async () => {
+    if (!params?.storeId || !params?.sizeId) {
+      toast.error('Store ID or Size ID is not available.');
+      return;
+    }
     try {
       setLoading(true);
       await axios.delete(`/api/${params.storeId}/sizes/${params.sizeId}`);

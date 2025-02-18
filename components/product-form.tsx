@@ -115,28 +115,44 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     try {
       setLoading(true);
 
-      if (initialData) {
-        await axios.patch(`/api/${params.storeId}/products/${params.productId}`, {
+      const storeId = params?.storeId;
+      const productId = params?.productId;
+
+      if (!storeId) {
+        toast.error('Store ID is missing.');
+        return;
+      }
+
+      if (initialData && !productId) {
+          toast.error('Product ID is missing.');
+          return;
+      }
+
+
+      if (initialData && productId) {
+        await axios.patch(`/api/${storeId}/products/${productId}`, {
           ...data,
-          variations: data.variations.map(v => ({
+          variations: data.variations.map((v) => ({
             sizeId: v.sizeId,
             colorId: v.colorId,
-            stock: v.stock
-          }))
+            stock: v.stock,
+          })),
         });
       } else {
-        await axios.post(`/api/${params.storeId}/products`, {
+        await axios.post(`/api/${storeId}/products`, {
           ...data,
-          variations: data.variations.map(v => ({
+          variations: data.variations.map((v) => ({
             sizeId: v.sizeId,
             colorId: v.colorId,
-            stock: v.stock
-          }))
+            stock: v.stock,
+          })),
         });
       }
 
       router.refresh();
-      router.push(`/${params.storeId}/products`);
+      if (storeId) {
+        router.push(`/${storeId}/products`);
+      }
       toast.success(toastMessage);
     } catch (error: any) {
       toast.error('Something went wrong.');
@@ -148,6 +164,10 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   const onDelete = async () => {
     try {
       setLoading(true);
+      if (!params || !params.storeId || !params.productId) {
+        toast.error('Missing store or product ID.');
+        return;
+      }
       await axios.delete(`/api/${params.storeId}/products/${params.productId}`);
       router.refresh();
       router.push(`/${params.storeId}/products`);
@@ -280,7 +300,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             <FormField
               control={form.control}
               name="descriptionId"
-              render={({ field }) => (
+              render={({ field }: { field: any }) => (
                 <FormItem>
                   <FormLabel>Description</FormLabel>
                   <Select disabled={loading} onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
@@ -356,7 +376,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                       sizes={sizes}
                       colors={colors}
                       existingVariations={field.value}
-                      onVariationsChange={field.onChange}
+                      onVariationsChangeAction={field.onChange}
                     />
                   </FormControl>
                   <FormMessage />

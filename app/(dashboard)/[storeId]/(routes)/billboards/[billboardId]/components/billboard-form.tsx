@@ -22,8 +22,8 @@ import {
 } from "@/components/ui/form"
 import { Separator } from "@/components/ui/separator"
 import { Heading } from "@/components/ui/heading"
-import { AlertModal } from "@/components/modals/alert-modal"
-import ImageUpload from "@/components/ui/image-upload"
+import { AlertModal } from "@/components/modals/alert-modal";
+import ImageUpload from "@/components/ui/image-upload";
 
 const formSchema = z.object({
   label: z.string().min(1),
@@ -39,7 +39,7 @@ interface BillboardFormProps {
 export const BillboardForm: React.FC<BillboardFormProps> = ({
   initialData
 }) => {
-  const params = useParams();
+  const params = useParams<{ storeId: string, billboardId: string }>();
   const router = useRouter();
 
   const [open, setOpen] = useState(false);
@@ -59,17 +59,22 @@ export const BillboardForm: React.FC<BillboardFormProps> = ({
   });
 
   const onSubmit = async (data: BillboardFormValues) => {
+    if (!params || !params.storeId || !params.billboardId) {
+      toast.error('Missing parameters.');
+      return;
+    }
+    const { storeId, billboardId } = params;
     try {
       setLoading(true);
       if (initialData) {
-        await axios.patch(`/api/${params.storeId}/billboards/${params.billboardId}`, data);
+        await axios.patch(`/api/${storeId}/billboards/${billboardId}`, data);
       } else {
-        await axios.post(`/api/${params.storeId}/billboards`, data);
+        await axios.post(`/api/${storeId}/billboards`, data);
       }
       router.refresh();
-      router.push(`/${params.storeId}/billboards`);
+      router.push(`/${storeId}/billboards`);
       toast.success(toastMessage);
-    } catch (error: any) {
+    } catch (error) {
       toast.error('Something went wrong.');
     } finally {
       setLoading(false);
@@ -77,19 +82,24 @@ export const BillboardForm: React.FC<BillboardFormProps> = ({
   };
 
   const onDelete = async () => {
+    if (!params || !params.storeId || !params.billboardId) {
+      toast.error('Missing parameters.');
+      return;
+    }
+    const { storeId, billboardId } = params;
     try {
       setLoading(true);
-      await axios.delete(`/api/${params.storeId}/billboards/${params.billboardId}`);
+      await axios.delete(`/api/${storeId}/billboards/${billboardId}`);
       router.refresh();
-      router.push(`/${params.storeId}/billboards`);
+      router.push(`/${storeId}/billboards`);
       toast.success('Billboard deleted.');
-    } catch (error: any) {
+    } catch (error) {
       toast.error('Make sure you removed all categories using this billboard first.');
     } finally {
       setLoading(false);
       setOpen(false);
     }
-  }
+  };
 
   return (
     <>

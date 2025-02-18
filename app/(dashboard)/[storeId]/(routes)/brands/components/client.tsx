@@ -3,6 +3,7 @@
 import { Plus } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 
+import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { Heading } from "@/components/ui/heading";
@@ -25,7 +26,13 @@ export const BrandsClient: React.FC<BrandsClientProps> = ({
     <>
       <div className="flex items-center justify-between">
         <Heading title={`Brands (${data.length})`} description="Manage brands for your products" />
-        <Button onClick={() => router.push(`/${params.storeId}/brands/new`)}>
+        <Button onClick={() => {
+          if (params && params.storeId) {
+            router.push(`/${params.storeId}/brands/new`);
+          } else {
+            toast.error("Store ID is missing.");
+          }
+        }}>
           <Plus className="mr-2 h-4 w-4" /> Add New
         </Button>
       </div>

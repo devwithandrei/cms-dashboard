@@ -75,42 +75,50 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const form = useForm<ProductFormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: initialData ? {
+      ...initialData,
+      price: parseFloat(String(initialData?.price)),
+      descriptionId: initialData?.descriptionId || '',
+      isFeatured: initialData?.isFeatured || false,
+      isArchived: initialData?.isArchived || false,
+      variations: initialData.productSizes.map((ps, index) => ({
+        sizeId: ps.sizeId,
+        colorId: initialData.productColors[index]?.colorId || '',
+        stock: ps.stock
+      }))
+    } : {
+      name: '',
+      images: [],
+      price: 0,
+      categoryId: '',
+      brandId: '',
+      descriptionId: '',
+      isFeatured: false,
+      isArchived: false,
+      variations: [{
+        sizeId: '',
+        colorId: '',
+        stock: 0
+      }]
+    }
+  });
+
+  if (!params) {
+    toast.error('Params are not available.');
+    return;
+  }
+
+  if (!params.storeId || !params.productId) {
+    toast.error('Store ID or Product ID is not available.');
+    return;
+  }
+
   const title = initialData ? 'Edit product' : 'Create product';
   const description = initialData ? 'Edit a product.' : 'Add a new product';
   const toastMessage = initialData ? 'Product updated.' : 'Product created.';
   const action = initialData ? 'Save changes' : 'Create';
-
-  const defaultValues = initialData ? {
-    ...initialData,
-    price: parseFloat(String(initialData?.price)),
-    descriptionId: initialData?.descriptionId || '',
-    isFeatured: initialData?.isFeatured || false,
-    isArchived: initialData?.isArchived || false,
-    variations: initialData.productSizes.map((ps, index) => ({
-      sizeId: ps.sizeId,
-      colorId: initialData.productColors[index]?.colorId || '',
-      stock: ps.stock
-    }))
-  } : {
-    name: '',
-    images: [],
-    price: 0,
-    categoryId: '',
-    brandId: '',
-    descriptionId: '',
-    isFeatured: false,
-    isArchived: false,
-    variations: [{
-      sizeId: '',
-      colorId: '',
-      stock: 0
-    }]
-  }
-
-  const form = useForm<ProductFormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues
-  });
 
   const onSubmit = async (data: ProductFormValues) => {
     try {
@@ -410,7 +418,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                   </Button>
                   <Separator className="my-4" />
                 </div>
-              ))}
+              ))} 
             </div>
           </div>
           <div className="md:grid md:grid-cols-3 gap-8">

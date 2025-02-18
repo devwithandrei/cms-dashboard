@@ -1,5 +1,6 @@
 "use client";
 
+import { toast } from "react-hot-toast";
 import { Plus } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 
@@ -25,7 +26,13 @@ export const ColorClient: React.FC<ColorClientProps> = ({
     <>
       <div className="flex items-center justify-between">
         <Heading title={`Colors (${data.length})`} description="Manage colors for your products" />
-        <Button onClick={() => router.push(`/${params.storeId}/colors/new`)}>
+        <Button onClick={() => {
+          if (params && params.storeId) {
+            router.push(`/${params.storeId}/colors/new`);
+          } else {
+            toast.error("Store ID not found");
+          }
+        }}>
           <Plus className="mr-2 h-4 w-4" /> Add New
         </Button>
       </div>

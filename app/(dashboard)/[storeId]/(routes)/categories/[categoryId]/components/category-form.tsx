@@ -63,13 +63,17 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({
   const onSubmit = async (data: CategoryFormValues) => {
     try {
       setLoading(true);
-      if (initialData) {
-        await axios.patch(`/api/${params.storeId}/categories/${params.categoryId}`, data);
+      if (params?.storeId && params?.categoryId) {
+        if (initialData) {
+          await axios.patch(`/api/${params.storeId}/categories/${params.categoryId}`, data);
+        } else {
+          await axios.post(`/api/${params.storeId}/categories`, data);
+        }
+        router.refresh();
+        router.push(`/${params.storeId}/categories`);
       } else {
-        await axios.post(`/api/${params.storeId}/categories`, data);
+        toast.error("Store ID or Category ID is missing.");
       }
-      router.refresh();
-      router.push(`/${params.storeId}/categories`);
       toast.success(toastMessage);
     } catch (error: any) {
       toast.error('Something went wrong.');
@@ -81,10 +85,14 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({
   const onDelete = async () => {
     try {
       setLoading(true);
-      await axios.delete(`/api/${params.storeId}/categories/${params.categoryId}`);
-      router.refresh();
-      router.push(`/${params.storeId}/categories`);
-      toast.success('Category deleted.');
+      if (params?.storeId && params?.categoryId){
+        await axios.delete(`/api/${params.storeId}/categories/${params.categoryId}`);
+        router.refresh();
+        router.push(`/${params.storeId}/categories`);
+        toast.success('Category deleted.');
+      } else {
+        toast.error("Store ID or Category ID is missing.");
+      }
     } catch (error: any) {
       toast.error('Make sure you removed all products using this category first.');
     } finally {

@@ -1,3 +1,5 @@
+/* eslint-disable import/named */
+
 "use client";
 
 import { Plus } from "lucide-react";
@@ -18,8 +20,12 @@ interface ProductsClientProps {
 export const ProductsClient: React.FC<ProductsClientProps> = ({
   data
 }) => {
-  const params = useParams();
   const router = useRouter();
+  const params = useParams();
+
+  if (!params || !params.storeId) {
+    return <div>Store ID is not available.</div>;
+  }
 
   return (
     <> 

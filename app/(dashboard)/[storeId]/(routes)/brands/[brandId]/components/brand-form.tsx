@@ -59,10 +59,16 @@ export const BrandForm: React.FC<BrandFormProps> = ({
   const onSubmit = async (data: BrandFormValues) => {
     try {
       setLoading(true);
+      if (!params?.storeId || !params?.brandId) {
+        toast.error("Missing storeId or brandId.");
+        return;
+      }
+      const { storeId, brandId } = params;
+
       if (initialData) {
-        await axios.patch(`/api/${params.storeId}/brands/${params.brandId}`, data);
+        await axios.patch(`/api/${storeId}/brands/${brandId}`, data);
       } else {
-        await axios.post(`/api/${params.storeId}/brands`, data);
+        await axios.post(`/api/${storeId}/brands`, data);
       }
       router.refresh();
       router.push(`/${params.storeId}/brands`);
@@ -77,9 +83,14 @@ export const BrandForm: React.FC<BrandFormProps> = ({
   const onDelete = async () => {
     try {
       setLoading(true);
-      await axios.delete(`/api/${params.storeId}/brands/${params.brandId}`);
+      if (!params?.storeId || !params?.brandId) {
+        toast.error("Missing storeId or brandId.");
+        return;
+      }
+      const { storeId, brandId } = params;
+      await axios.delete(`/api/${storeId}/brands/${brandId}`);
       router.refresh();
-      router.push(`/${params.storeId}/brands`);
+      router.push(`/${storeId}/brands`);
       toast.success('Brand deleted.');
     } catch (error: any) {
       toast.error('Make sure you removed all products using this Brand first.');

@@ -1,5 +1,6 @@
 "use client";
 
+import { toast } from "react-hot-toast";
 import { Plus } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 
@@ -26,7 +27,13 @@ export const CategoriesClient: React.FC<CategoriesClientProps> = ({
     <>
       <div className="flex items-center justify-between">
         <Heading title={`Categories (${data.length})`} description="Manage categories for your store" />
-        <Button onClick={() => router.push(`/${params.storeId}/categories/new`)}>
+        <Button onClick={() => {
+          if (params && params.storeId) {
+            router.push(`/${params.storeId}/categories/new`);
+          } else {
+            toast.error("Store ID not found");
+          }
+        }}>
           <Plus className="mr-2 h-4 w-4" /> Add New
         </Button>
       </div>

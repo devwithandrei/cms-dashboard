@@ -2,6 +2,7 @@
 
 import { Plus } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
+import { toast } from "react-hot-toast";
 
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
@@ -25,7 +26,14 @@ export const BillboardClient: React.FC<BillboardClientProps> = ({
     <>
       <div className="flex items-center justify-between">
         <Heading title={`Billboards (${data.length})`} description="Manage billboards for your store" />
-        <Button onClick={() => router.push(`/${params.storeId}/billboards/new`)}>
+        <Button onClick={() => {
+          if (!params?.storeId) {
+            toast.error("Missing storeId.");
+            return;
+          }
+          const { storeId } = params;
+          router.push(`/${storeId}/billboards/new`);
+        }}>
           <Plus className="mr-2 h-4 w-4" /> Add New
         </Button>
       </div>

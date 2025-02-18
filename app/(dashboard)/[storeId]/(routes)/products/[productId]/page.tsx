@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs";
 import { redirect } from "next/navigation";
 import prismadb from "@/lib/prismadb";
+import toast from 'react-hot-toast';
 
 import { ProductForm } from "./components/product-form";
 import StockManagement from "@/components/stock-management";
@@ -13,6 +14,20 @@ const ProductPage = async ({
   params: { productId: string, storeId: string }
 }) => {
   const { userId } = auth();
+
+  if (!params) {
+    return null;
+  }
+
+  if (!params) {
+    toast.error('Params is not available.');
+    return;
+  }
+
+  if (!params.storeId || !params.productId) {
+    toast.error('Store ID or Product ID is not available.');
+    return;
+  }
 
   const product = await prismadb.product.findUnique({
     where: {

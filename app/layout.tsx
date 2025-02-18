@@ -28,7 +28,8 @@ export default function RootLayout({
         }
       }}
     >
-      <html lang="en">
+      <html lang="en" className="bg-white dark:bg-gray-900">
+        <head />
         <body className={inter.className}>
           <ThemeProvider 
             attribute="class" 

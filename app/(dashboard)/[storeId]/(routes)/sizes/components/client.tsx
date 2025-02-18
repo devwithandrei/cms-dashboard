@@ -2,6 +2,7 @@
 
 import { Plus } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
+import { toast } from "react-hot-toast";
 
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
@@ -25,7 +26,13 @@ export const SizesClient: React.FC<SizesClientProps> = ({
     <>
       <div className="flex items-center justify-between">
         <Heading title={`Sizes (${data.length})`} description="Manage sizes for your products" />
-        <Button onClick={() => router.push(`/${params.storeId}/sizes/new`)}>
+        <Button onClick={() => {
+          if (!params?.storeId) {
+            toast.error('Store ID not found!');
+            return;
+          }
+          router.push(`/${params.storeId}/sizes/new`);
+        }}>
           <Plus className="mr-2 h-4 w-4" /> Add New
         </Button>
       </div>

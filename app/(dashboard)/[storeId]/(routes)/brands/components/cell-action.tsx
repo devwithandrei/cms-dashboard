@@ -33,8 +33,12 @@ export const CellAction: React.FC<CellActionProps> = ({
   const onConfirm = async () => {
     try {
       setLoading(true);
-      await axios.delete(`/api/${params.storeId}/brands/${data.id}`);
-      toast.success('Brand deleted.');
+      if (params && params.storeId) {
+        await axios.delete(`/api/${params.storeId}/brands/${data.id}`);
+        toast.success('Brand deleted.');
+      } else {
+        toast.error("Store ID is missing.");
+      }
       router.refresh();
     } catch (error) {
       toast.error('Make sure you removed all products using this Brand first.');
@@ -72,7 +76,13 @@ export const CellAction: React.FC<CellActionProps> = ({
             <Copy className="mr-2 h-4 w-4" /> Copy Id
           </DropdownMenuItem>
           <DropdownMenuItem
-            onClick={() => router.push(`/${params.storeId}/brands/${data.id}`)}
+            onClick={() => {
+              if (params && params.storeId) {
+                router.push(`/${params.storeId}/brands/${data.id}`);
+              } else {
+                toast.error("Store ID is missing.");
+              }
+            }}
           >
             <Edit className="mr-2 h-4 w-4" /> Update
           </DropdownMenuItem>

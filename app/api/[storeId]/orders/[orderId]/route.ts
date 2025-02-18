@@ -42,19 +42,48 @@ export async function GET(
         storeId: params.storeId,
       },
       include: {
-        orderItems: {
-          include: {
-            product: true,
-            size: true,
-            color: true
-          }
-        }
+        orderItems: true,
       }
     });
 
     return new NextResponse(JSON.stringify(order), { headers: corsHeaders });
   } catch (error) {
     console.log('[ORDER_GET]', error);
+    return new NextResponse("Internal error", { status: 500, headers: corsHeaders });
+  }
+}
+
+export async function DELETE(
+  req: Request,
+  { params }: { params: { orderId: string; storeId: string } }
+) {
+  try {
+    if (!params.orderId) {
+      return new NextResponse("Order id is required", { status: 400, headers: corsHeaders });
+    }
+
+    if (!params.storeId) {
+      return new NextResponse("Store id is required", { status: 400, headers: corsHeaders });
+    }
+
+    // First, delete the associated OrderItems
+    await prismadb.orderItem.deleteMany({
+      where: {
+        orderId: params.orderId,
+      },
+    });
+
+    // Then, delete the Order
+    const order = await prismadb.order.delete({
+      where: {
+        id: params.orderId,
+        storeId: params.storeId,
+      },
+    });
+
+    return new NextResponse(JSON.stringify(order), { headers: corsHeaders });
+  } catch (error) {
+    console.log('[ORDER_DELETE]', error);
     return new NextResponse("Internal error", { status: 500, headers: corsHeaders });
   }
 }

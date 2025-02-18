@@ -31,9 +31,14 @@ export const CellAction: React.FC<CellActionProps> = ({
   const [loading, setLoading] = useState(false);
 
   const onConfirm = async () => {
+    if (!params?.storeId) {
+      toast.error("Missing storeId.");
+      return;
+    }
+    const { storeId } = params;
     try {
       setLoading(true);
-      await axios.delete(`/api/${params.storeId}/billboards/${data.id}`);
+      await axios.delete(`/api/${storeId}/billboards/${data.id}`);
       toast.success('Billboard deleted.');
       router.refresh();
     } catch (error) {
@@ -72,7 +77,14 @@ export const CellAction: React.FC<CellActionProps> = ({
             <Copy className="mr-2 h-4 w-4" /> Copy Id
           </DropdownMenuItem>
           <DropdownMenuItem
-            onClick={() => router.push(`/${params.storeId}/billboards/${data.id}`)}
+            onClick={() => {
+              if (!params?.storeId) {
+                toast.error("Missing storeId.");
+                return;
+              }
+              const { storeId } = params;
+              router.push(`/${storeId}/billboards/${data.id}`);
+            }}
           >
             <Edit className="mr-2 h-4 w-4" /> Update
           </DropdownMenuItem>

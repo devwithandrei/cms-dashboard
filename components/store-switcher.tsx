@@ -38,13 +38,13 @@ export default function StoreSwitcher({ className, items = [] }: StoreSwitcherPr
     value: item.id
   }));
 
-  const currentStore = formattedItems.find((item) => item.value === params.storeId);
+  const currentStore = params ? formattedItems.find((item) => item.value === params.storeId) : undefined;
 
   const [open, setOpen] = React.useState(false)
 
   const onStoreSelect = (store: { value: string, label: string }) => {
     setOpen(false);
-    if (params.storeId !== store.value) {
+    if (params?.storeId !== store.value) {
       router.push(`/${store.value}`);
     }
   };

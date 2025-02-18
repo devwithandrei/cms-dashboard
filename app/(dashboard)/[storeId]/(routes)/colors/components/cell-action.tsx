@@ -33,9 +33,13 @@ export const CellAction: React.FC<CellActionProps> = ({
   const onConfirm = async () => {
     try {
       setLoading(true);
-      await axios.delete(`/api/${params.storeId}/colors/${data.id}`);
-      toast.success('Color deleted.');
-      router.refresh();
+      if (params && params.storeId) {
+        await axios.delete(`/api/${params.storeId}/colors/${data.id}`);
+        toast.success('Color deleted.');
+        router.refresh();
+      } else {
+        toast.error('Store ID not found.');
+      }
     } catch (error) {
       toast.error('Make sure you removed all products using this color first.');
     } finally {
@@ -72,7 +76,13 @@ export const CellAction: React.FC<CellActionProps> = ({
             <Copy className="mr-2 h-4 w-4" /> Copy Id
           </DropdownMenuItem>
           <DropdownMenuItem
-            onClick={() => router.push(`/${params.storeId}/colors/${data.id}`)}
+            onClick={() => {
+              if (params && params.storeId) {
+                router.push(`/${params.storeId}/colors/${data.id}`);
+              } else {
+                toast.error('Store ID not found.');
+              }
+            }}
           >
             <Edit className="mr-2 h-4 w-4" /> Update
           </DropdownMenuItem>

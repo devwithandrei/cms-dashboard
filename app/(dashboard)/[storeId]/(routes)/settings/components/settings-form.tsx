@@ -54,6 +54,10 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
   const onSubmit = async (data: SettingsFormValues) => {
     try {
       setLoading(true);
+      if (!params || !params.storeId) {
+        toast.error('Store ID is not available.');
+        return;
+      }
       await axios.patch(`/api/stores/${params.storeId}`, data);
       router.refresh();
       toast.success('Store updated.');
@@ -67,6 +71,10 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
   const onDelete = async () => {
     try {
       setLoading(true);
+      if (!params || !params.storeId) {
+        toast.error('Store ID is not available.');
+        return;
+      }
       await axios.delete(`/api/stores/${params.storeId}`);
       router.refresh();
       router.push('/');
@@ -122,11 +130,13 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
         </form>
       </Form>
       <Separator />
-      <ApiAlert 
-        title="NEXT_PUBLIC_API_URL" 
-        variant="public" 
-        description={`${origin}/api/${params.storeId}`}
-      />
+      {params && params.storeId && (
+        <ApiAlert 
+          title="NEXT_PUBLIC_API_URL" 
+          variant="public" 
+          description={`${origin}/api/${params.storeId}`}
+        />
+      )}
     </>
   );
 };

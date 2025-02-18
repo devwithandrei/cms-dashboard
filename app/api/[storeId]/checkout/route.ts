@@ -169,7 +169,7 @@ export async function POST(
         line_items.push({
           quantity: item.quantity,
           price_data: {
-            currency: 'USD',
+            currency: 'EUR',
             product_data: {
               name: itemName,
               images: item.product.images.map(img => img.url),
