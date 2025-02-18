@@ -1,9 +1,8 @@
 "use client"
-import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { Toaster } from 'react-hot-toast';
 
 const ToastProvider = () => {
-return <ToastContainer aria-label="Toast Notifications" />;
+return <Toaster />;
 };
 
 export default ToastProvider;
