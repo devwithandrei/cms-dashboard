@@ -2,8 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import axios from 'axios';
-import { ToastContainer, toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { toast } from "react-hot-toast";
 import { OrderColumn } from "./components/columns";
 import { format } from "date-fns";
 import { useState } from "react";
@@ -37,7 +36,7 @@ const OrdersClient: React.FC<OrdersClientProps> = ({ orders, storeId }) => {
 
   return (
     <div className="flex bg-white dark:bg-gray-800">
-      <ToastContainer aria-label="Toast Notifications" />
+      
       <div className="flex-1 p-4">
         <h2 className="text-xl font-bold text-black dark:text-white">Paid Orders</h2>
         <div className="flex flex-col space-y-4">

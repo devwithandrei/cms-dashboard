@@ -1,7 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
 import useSWR from 'swr';
-import { toast } from "react-toastify";
 import { OrderColumn } from "./components/columns";
 import OrdersClient from "./OrdersClient";
 import { useParams } from "next/navigation";
@@ -23,7 +22,6 @@ const OrdersPage = () => {
   }
 
   if (error) {
-    toast.error("Failed to fetch orders");
     return <div>Error loading orders</div>;
   }
 
