@@ -8,13 +8,13 @@ export default authMiddleware({
     "/api/:storeId/checkout",
     "/api/webhook",
     "/api/:storeId/products",
-    "/api/:storeId/categories",
+    "/api/:storeId/categories/:categoryId",
     "/api/:storeId/sizes",
     "/api/:storeId/colors",
     "/api/:storeId/billboards",
     "/sign-in",
     "/sign-up",
-    "/api/stores",
+    "/api/(.*)"
   ],
   afterAuth(auth, req) {
     // Handle auth state

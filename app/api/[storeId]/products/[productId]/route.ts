@@ -101,7 +101,8 @@ export async function PATCH(
       images,
       isFeatured,
       isArchived,
-      variations
+      variations,
+      stock
     } = body;
 
     if (!params.productId) {
@@ -109,8 +110,12 @@ export async function PATCH(
     }
 
     // Validate the request
-    if (!name || !price || !categoryId || !brandId || !images?.length || !variations?.length) {
+    if (!name || !price || !categoryId || !brandId || !images?.length) {
       return new NextResponse("Missing required fields", { status: 400, headers: corsHeaders });
+    }
+
+    if (!variations?.length && typeof stock !== 'number') {
+      return new NextResponse("Base stock is required for products without variations", { status: 400, headers: corsHeaders });
     }
 
     // Check if the user has access to this store
@@ -150,28 +155,35 @@ export async function PATCH(
           descriptionId,
           isFeatured,
           isArchived,
+          stock: !variations?.length ? stock : undefined,
           images: {
             deleteMany: {},
             createMany: {
               data: images.map((image: { url: string }) => image)
             }
           },
-          productSizes: {
-            createMany: {
-              data: variations.map((v: { sizeId: string, stock: number }) => ({
-                sizeId: v.sizeId,
-                stock: v.stock
-              }))
+          ...(variations?.length ? {
+            productSizes: {
+              createMany: {
+                data: variations
+                  .filter((v: any) => v.sizeId)
+                  .map((v: { sizeId: string, stock: number }) => ({
+                    sizeId: v.sizeId,
+                    stock: v.stock
+                  }))
+              }
+            },
+            productColors: {
+              createMany: {
+                data: variations
+                  .filter((v: any) => v.colorId)
+                  .map((v: { colorId: string, stock: number }) => ({
+                    colorId: v.colorId,
+                    stock: v.stock
+                  }))
+              }
             }
-          },
-          productColors: {
-            createMany: {
-              data: variations.map((v: { colorId: string, stock: number }) => ({
-                colorId: v.colorId,
-                stock: v.stock
-              }))
-            }
-          }
+          } : {})
         },
         include: {
           images: true,

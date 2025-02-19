@@ -47,6 +47,7 @@ export type Product = {
   categoryId: string;
   brandId: string;
   descriptionId?: string;
+  stock?: number | undefined;
   createdAt: Date;
   updatedAt: Date;
   images: { url: string }[];
@@ -70,6 +71,12 @@ export type ProductColor = {
   stock: number;
   color: Color;
 };
+
+export type ProductVariation = {
+  sizeId?: string | undefined;
+  colorId?: string | undefined;
+  stock: number;
+}
 
 export type Order = {
   id: string;

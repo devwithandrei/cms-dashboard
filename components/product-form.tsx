@@ -33,6 +33,7 @@ import { AlertModal } from '@/components/modals/alert-modal';
 import ProductVariationsForm from '@/components/product-variations-form';
 import axios from 'axios';
 import { useParams, useRouter } from 'next/navigation';
+import { ProductVariation } from '@/types';
 
 const formSchema = z.object({
   name: z.string().min(1),
@@ -43,11 +44,12 @@ const formSchema = z.object({
   descriptionId: z.string().optional(),
   isFeatured: z.boolean().default(false).optional(),
   isArchived: z.boolean().default(false).optional(),
+  stock: z.coerce.number().min(0),
   variations: z.array(z.object({
-    sizeId: z.string().min(1, "Size is required"),
-    colorId: z.string().min(1, "Color is required"),
-    stock: z.number().min(0, "Stock must be 0 or greater")
-  }))
+    sizeId: z.string().optional(), // Optional without min validation
+    colorId: z.string().optional(), // Optional without min validation
+    stock: z.coerce.number().min(0),
+  })).optional(),
 });
 
 type ProductFormValues = z.infer<typeof formSchema>;
@@ -71,6 +73,9 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 }) => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showVariations, setShowVariations] = useState(!!initialData?.productSizes?.length || !!initialData?.productColors?.length);
+  const [stock, setStock] = useState(initialData ? initialData.stock || 0 : 0);
+  const [variations, setVariations] = useState(initialData ? (initialData.productSizes || initialData.productColors) : []);
 
   const params = useParams();
   const router = useRouter();
@@ -89,11 +94,23 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     descriptionId: initialData.descriptionId,
     isFeatured: initialData.isFeatured,
     isArchived: initialData.isArchived,
-    variations: initialData.productSizes.map((size, index) => ({
-      sizeId: size.sizeId,
-      colorId: initialData.productColors[index]?.colorId || '',
-      stock: size.stock
-    }))
+    stock: initialData.stock,
+    variations: (initialData.productSizes || initialData.productColors)
+      ? (initialData.productSizes || initialData.productColors || [])
+          .map(
+            (variation: any, index: number): ProductVariation => ({
+              sizeId:
+                initialData.productSizes && initialData.productSizes[index]
+                  ? initialData.productSizes[index].sizeId
+                  : undefined,
+              colorId:
+                initialData.productColors && initialData.productColors[index]
+                  ? initialData.productColors[index].colorId
+                  : undefined,
+              stock: variation.stock, // Include the stock property
+            })
+          )
+      : [],
   } : {
     name: '',
     images: [],
@@ -103,6 +120,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     descriptionId: '',
     isFeatured: false,
     isArchived: false,
+    stock: 0,
     variations: []
   };
 
@@ -110,6 +128,15 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     resolver: zodResolver(formSchema),
     defaultValues
   });
+
+  const handleAddVariation = () => {
+    setShowVariations(true);
+  };
+
+  const handleRemoveVariation = (index: number) => {
+    const updatedVariations = variations.filter((_, i) => i !== index);
+    setVariations(updatedVariations);
+  };
 
   const onSubmit = async (data: ProductFormValues) => {
     try {
@@ -124,29 +151,20 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       }
 
       if (initialData && !productId) {
-          toast.error('Product ID is missing.');
-          return;
+        toast.error('Product ID is missing.');
+        return;
       }
 
+      const submissionData = {
+        ...data,
+        stock,
+        variations: data.variations, // Allow empty variations
+      };
 
       if (initialData && productId) {
-        await axios.patch(`/api/${storeId}/products/${productId}`, {
-          ...data,
-          variations: data.variations.map((v) => ({
-            sizeId: v.sizeId,
-            colorId: v.colorId,
-            stock: v.stock,
-          })),
-        });
+        await axios.patch(`/api/${storeId}/products/${productId}`, submissionData);
       } else {
-        await axios.post(`/api/${storeId}/products`, {
-          ...data,
-          variations: data.variations.map((v) => ({
-            sizeId: v.sizeId,
-            colorId: v.colorId,
-            stock: v.stock,
-          })),
-        });
+        await axios.post(`/api/${storeId}/products`, submissionData);
       }
 
       router.refresh();
@@ -367,22 +385,52 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             />
             <FormField
               control={form.control}
-              name="variations"
-              render={({ field }) => (
+              name="stock"
+              render={() => (
                 <FormItem>
-                  <FormLabel>Product Variations</FormLabel>
+                  <FormLabel>Stock</FormLabel>
                   <FormControl>
-                    <ProductVariationsForm
-                      sizes={sizes}
-                      colors={colors}
-                      existingVariations={field.value}
-                      onVariationsChangeAction={field.onChange}
+                    <Input
+                      type="number"
+                      min="0"
+                      value={stock}
+                      onChange={(e) => setStock(parseInt(e.target.value) || 0)}
                     />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
+            <div className="space-y-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleAddVariation}
+              >
+                Add Variation
+              </Button>
+              {showVariations && (
+                <FormField
+                  control={form.control}
+                  name="variations"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Product Variations</FormLabel>
+                      <FormControl>
+                        <ProductVariationsForm
+                          sizes={sizes}
+                          colors={colors}
+                          existingVariations={field.value || []}
+                          onVariationsChangeAction={field.onChange}
+                          onRemoveVariationAction={handleRemoveVariation}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+            </div>
           </div>
           <Separator />
           <Button disabled={loading} className="ml-auto" type="submit">

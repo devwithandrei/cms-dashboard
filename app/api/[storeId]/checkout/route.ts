@@ -2,6 +2,39 @@ import Stripe from "stripe";
 import { NextResponse } from "next/server";
 import { stripe, handleStripeError } from "@/lib/stripe";
 import prismadb from "@/lib/prismadb";
+import { Product, Size, Color } from "@/types";
+
+interface ProductSize {
+  id: string;
+  productId: string;
+  sizeId: string;
+  stock: number;
+  size: {
+    id: string;
+    name: string;
+  };
+}
+
+interface ProductColor {
+  id: string;
+  productId: string;
+  colorId: string;
+  stock: number;
+  color: {
+    id: string;
+    name: string;
+  };
+}
+
+interface ProductWithStock {
+  id: string;
+  name: string;
+  price: any;
+  stock: number | null;
+  images: { url: string }[];
+  productSizes: ProductSize[];
+  productColors: ProductColor[];
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -85,6 +118,54 @@ export async function POST(
         status: 400,
         headers: corsHeaders,
       });
+    }
+
+    // Validate stock for each product
+    for (let i = 0; i < productIds.length; i++) {
+      const product = products.find(p => p.id === productIds[i]) as unknown as ProductWithStock;
+      if (!product) continue;
+
+      const quantity = quantities[i];
+      const sizeId = sizes[i];
+      const colorId = colors[i];
+
+      // Check stock based on product type
+      if (!sizeId && !colorId) {
+        // Product without variations
+        if (!product.stock || product.stock < quantity) {
+          return new NextResponse(`Product ${product.name} is out of stock`, {
+            status: 400,
+            headers: corsHeaders,
+          });
+        }
+      } else if (sizeId && !colorId) {
+        // Product with only size
+        const sizeVariation = product.productSizes.find(ps => ps.size.id === sizeId);
+        if (!sizeVariation || sizeVariation.stock < quantity) {
+          return new NextResponse(`Selected size for ${product.name} is out of stock`, {
+            status: 400,
+            headers: corsHeaders,
+          });
+        }
+      } else if (!sizeId && colorId) {
+        // Product with only color
+        const colorVariation = product.productColors.find(pc => pc.color.id === colorId);
+        if (!colorVariation || colorVariation.stock < quantity) {
+          return new NextResponse(`Selected color for ${product.name} is out of stock`, {
+            status: 400,
+            headers: corsHeaders,
+          });
+        }
+      } else if (sizeId && colorId) {
+        // Product with both size and color
+        const sizeVariation = product.productSizes.find(ps => ps.size.id === sizeId);
+        if (!sizeVariation || sizeVariation.stock < quantity) {
+          return new NextResponse(`Selected variation for ${product.name} is out of stock`, {
+            status: 400,
+            headers: corsHeaders,
+          });
+        }
+      }
     }
 
     try {
@@ -195,6 +276,46 @@ export async function POST(
       });
       console.log('Stripe session created:', session.id);
 
+      // Update stock after successful order creation
+      for (let i = 0; i < productIds.length; i++) {
+        const product = products.find(p => p.id === productIds[i]) as unknown as ProductWithStock;
+        if (!product) continue;
+
+        const quantity = quantities[i];
+        const sizeId = sizes[i];
+        const colorId = colors[i];
+
+        if (!sizeId && !colorId) {
+          // Product without variations
+          await prismadb.product.update({
+            where: { id: product.id },
+            data: { stock: { decrement: quantity } }
+          });
+        } else if (sizeId && !colorId) {
+          // Product with only size
+          await prismadb.productSize.update({
+            where: { productId_sizeId: { productId: product.id, sizeId: sizeId } },
+            data: { stock: { decrement: quantity } }
+          });
+        } else if (!sizeId && colorId) {
+          // Product with only color
+          await prismadb.productColor.update({
+            where: { productId_colorId: { productId: product.id, colorId: colorId } },
+            data: { stock: { decrement: quantity } }
+          });
+        } else if (sizeId && colorId) {
+          // Product with both size and color
+          await prismadb.productSize.update({
+            where: { productId_sizeId: { productId: product.id, sizeId: sizeId } },
+            data: { stock: { decrement: quantity } }
+          });
+          await prismadb.productColor.update({
+            where: { productId_colorId: { productId: product.id, colorId: colorId } },
+            data: { stock: { decrement: quantity } }
+          });
+        }
+      }
+
       return NextResponse.json({ url: session.url }, {
         headers: corsHeaders
       });
@@ -223,3 +344,4 @@ export async function POST(
     });
   }
 }
+

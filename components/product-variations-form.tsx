@@ -16,8 +16,8 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 
 interface ProductVariation {
-  sizeId: string;
-  colorId: string;
+  sizeId?: string;
+  colorId?: string;
   stock: number;
 }
 
@@ -26,6 +26,7 @@ interface ProductVariationsFormProps {
   colors: Color[];
   existingVariations?: ProductVariation[];
   onVariationsChangeAction: (variations: ProductVariation[]) => void;
+  onRemoveVariationAction: (index: number) => void;
 }
 
 export const ProductVariationsForm: React.FC<ProductVariationsFormProps> = ({
@@ -33,18 +34,19 @@ export const ProductVariationsForm: React.FC<ProductVariationsFormProps> = ({
   colors,
   existingVariations = [],
   onVariationsChangeAction,
+  onRemoveVariationAction,
 }) => {
   const [variations, setVariations] = useState<ProductVariation[]>(existingVariations);
 
   const addVariation = () => {
     setVariations(prev => [
       ...prev,
-      { sizeId: '', colorId: '', stock: 0 }
+      { sizeId: undefined, colorId: undefined, stock: 0 }
     ]);
-    onVariationsChangeAction([...variations, { sizeId: '', colorId: '', stock: 0 }]);
+    onVariationsChangeAction([...variations, { sizeId: undefined, colorId: undefined, stock: 0 }]);
   };
 
-  const updateVariation = (index: number, field: keyof ProductVariation, value: string | number) => {
+  const updateVariation = (index: number, field: keyof ProductVariation, value: string | number | undefined) => {
     const updatedVariations = variations.map((variation, i) => {
       if (i === index) {
         return {
@@ -63,6 +65,12 @@ export const ProductVariationsForm: React.FC<ProductVariationsFormProps> = ({
     const updatedVariations = variations.filter((_, i) => i !== index);
     setVariations(updatedVariations);
     onVariationsChangeAction(updatedVariations);
+    
+    // If all variations are removed, call the action if needed
+    if (updatedVariations.length === 0) {
+      // Optionally call a function here to handle the removal of all variations
+      // onAllVariationsRemovedAction(); // Uncomment if needed
+    }
   };
 
   return (
@@ -83,42 +91,48 @@ export const ProductVariationsForm: React.FC<ProductVariationsFormProps> = ({
         {variations.map((variation, index) => (
           <Card key={index} className="p-4">
             <div className="grid grid-cols-4 gap-4">
-              <div className="col-span-1">
-                <Label>Size</Label>
-                <Select
-                  value={variation.sizeId}
-                  onValueChange={(value) => updateVariation(index, 'sizeId', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select size" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {sizes.map((size) => (
-                      <SelectItem key={size.id} value={size.id}>
-                        {size.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="col-span-1">
-                <Label>Color</Label>
-                <Select
-                  value={variation.colorId}
-                  onValueChange={(value) => updateVariation(index, 'colorId', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select color" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {colors.map((color) => (
-                      <SelectItem key={color.id} value={color.id}>
-                        {color.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {sizes.length > 0 && (
+                <div className="col-span-1">
+                  <Label>Size (Optional)</Label>
+                  <Select
+                    value={variation.sizeId || ''}
+                    onValueChange={(value) => updateVariation(index, 'sizeId', value === '' ? undefined : value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select size" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">No size</SelectItem>
+                      {sizes.map((size) => (
+                        <SelectItem key={size.id} value={size.id}>
+                          {size.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {colors.length > 0 && (
+                <div className="col-span-1">
+                  <Label>Color (Optional)</Label>
+                  <Select
+                    value={variation.colorId || ''}
+                    onValueChange={(value) => updateVariation(index, 'colorId', value === '' ? undefined : value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select color" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">No color</SelectItem>
+                      {colors.map((color) => (
+                        <SelectItem key={color.id} value={color.id}>
+                          {color.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="col-span-1">
                 <Label>Stock</Label>
                 <Input
@@ -140,16 +154,6 @@ export const ProductVariationsForm: React.FC<ProductVariationsFormProps> = ({
               </div>
             </div>
           </Card>
-        ))}
-      </div>
-      <div>
-        {variations.map((variation, index) => (
-          <div key={index} className="variation-item">
-            <span>Size: {sizes.find(size => size.id === variation.sizeId)?.name}</span>
-            <span>Color: {colors.find(color => color.id === variation.colorId)?.name}</span>
-            <span>Stock: {variation.stock}</span>
-            <span>Selected Variation: {sizes.find(size => size.id === variation.sizeId)?.name} - {colors.find(color => color.id === variation.colorId)?.name} - Stock: {variation.stock}</span>
-          </div>
         ))}
       </div>
     </div>

@@ -61,6 +61,7 @@ model Product {
   brandId       String
   descriptionId String?
   storeId       String
+  stock         Int?          // Base stock for products without variations
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   isArchived    Boolean        @default(false)

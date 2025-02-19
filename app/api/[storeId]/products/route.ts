@@ -3,8 +3,8 @@ import prismadb from '@/lib/prismadb';
 import { auth } from '@clerk/nextjs';
 
 interface ProductVariation {
-  sizeId: string;
-  colorId: string;
+  sizeId?: string;
+  colorId?: string;
   stock: number;
 }
 
@@ -13,7 +13,8 @@ interface ProductRequestBody {
   price: number;
   categoryId: string;
   brandId: string;
-  variations: ProductVariation[];
+  variations?: ProductVariation[];
+  stock?: number;
   images: { url: string }[];
   isFeatured?: boolean;
   isArchived?: boolean;
@@ -141,6 +142,7 @@ export async function GET(
         images: product.images,
         sizes,
         colors,
+        stock: product.stock,
         createdAt: product.createdAt.toISOString(),
         updatedAt: product.updatedAt.toISOString()
       };
@@ -149,7 +151,8 @@ export async function GET(
         sizeCount: transformed.sizes.length,
         colorCount: transformed.colors.length,
         sizes: transformed.sizes,
-        colors: transformed.colors
+        colors: transformed.colors,
+        stock: transformed.stock
       });
 
       return transformed;
@@ -202,8 +205,9 @@ export async function POST(
       return new NextResponse("Store id is required", { status: 400, headers: corsHeaders });
     }
 
-    if (!body.variations || !body.variations.length) {
-      return new NextResponse("At least one variation (size/color) is required", { status: 400, headers: corsHeaders });
+    // Ensure stock is provided if no variations
+    if (!body.variations?.length && typeof body.stock !== 'number') {
+      return new NextResponse("Base stock is required for products without variations", { status: 400, headers: corsHeaders });
     }
 
     console.log('Creating product with variations:', body.variations);
@@ -219,7 +223,7 @@ export async function POST(
       return new NextResponse("Unauthorized", { status: 405, headers: corsHeaders });
     }
 
-    // Create the product first
+    // Create the product with optional stock field
     const product = await prismadb.product.create({
       data: {
         name: body.name,
@@ -230,6 +234,7 @@ export async function POST(
         brandId: body.brandId,
         storeId: params.storeId,
         descriptionId: body.descriptionId,
+        stock: body.stock,
         images: {
           createMany: {
             data: body.images.map((image: { url: string }) => image),
@@ -240,31 +245,41 @@ export async function POST(
 
     console.log('Created product:', product);
 
-    // Create product variations
-    const productSizes = body.variations.map((variation: ProductVariation) => ({
-      productId: product.id,
-      sizeId: variation.sizeId,
-      stock: variation.stock,
-    }));
+    // Create product variations if provided and not empty
+    if (body.variations?.length) {
+      const validVariations = body.variations.filter(v => v.sizeId || v.colorId);
+      
+      if (validVariations.length > 0) {
+        const productSizes = validVariations
+          .filter(v => v.sizeId)
+          .map((variation: ProductVariation) => ({
+            productId: product.id,
+            sizeId: variation.sizeId!,
+            stock: variation.stock,
+          }));
 
-    const productColors = body.variations.map((variation: ProductVariation) => ({
-      productId: product.id,
-      colorId: variation.colorId,
-      stock: variation.stock,
-    }));
+        const productColors = validVariations
+          .filter(v => v.colorId)
+          .map((variation: ProductVariation) => ({
+            productId: product.id,
+            colorId: variation.colorId!,
+            stock: variation.stock,
+          }));
 
-    console.log('Creating sizes:', productSizes);
-    console.log('Creating colors:', productColors);
+        console.log('Creating sizes:', productSizes);
+        console.log('Creating colors:', productColors);
 
-    // Create sizes and colors in parallel
-    await Promise.all([
-      prismadb.productSize.createMany({
-        data: productSizes
-      }),
-      prismadb.productColor.createMany({
-        data: productColors
-      })
-    ]);
+        // Create sizes and colors in parallel if they exist
+        await Promise.all([
+          productSizes.length > 0 && prismadb.productSize.createMany({
+            data: productSizes
+          }),
+          productColors.length > 0 && prismadb.productColor.createMany({
+            data: productColors
+          })
+        ].filter(Boolean));
+      }
+    }
 
     // Fetch the complete product with all relations
     const completeProduct = await prismadb.product.findUnique({
@@ -295,6 +310,7 @@ export async function POST(
       id: completeProduct.id,
       sizeCount: completeProduct.productSizes.length,
       colorCount: completeProduct.productColors.length,
+      stock: completeProduct.stock,
       sizes: completeProduct.productSizes.map(ps => ({
         id: ps.size.id,
         name: ps.size.name,
@@ -332,6 +348,7 @@ export async function POST(
         value: pc.color.value,
         stock: pc.stock
       })),
+      stock: completeProduct.stock,
       createdAt: completeProduct.createdAt.toISOString(),
       updatedAt: completeProduct.updatedAt.toISOString()
     };
@@ -340,6 +357,7 @@ export async function POST(
       id: transformedProduct.id,
       sizeCount: transformedProduct.sizes.length,
       colorCount: transformedProduct.colors.length,
+      stock: transformedProduct.stock,
       sizes: transformedProduct.sizes,
       colors: transformedProduct.colors
     });
