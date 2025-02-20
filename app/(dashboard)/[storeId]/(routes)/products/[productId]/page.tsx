@@ -48,19 +48,9 @@ const ProductPage = async ({
     }
   });
 
+  const transformedProduct = product;
+
   const categories = await prismadb.category.findMany({
-    where: {
-      storeId: params.storeId,
-    },
-  });
-
-  const brands = await prismadb.brand.findMany({
-    where: {
-      storeId: params.storeId,
-    },
-  });
-
-  const descriptions = await prismadb.description.findMany({
     where: {
       storeId: params.storeId,
     },
@@ -78,13 +68,21 @@ const ProductPage = async ({
     },
   });
 
+  const brands = await prismadb.brand.findMany({
+    where: {
+      storeId: params.storeId,
+    },
+  });
+
+  const descriptions = await prismadb.description.findMany({
+    where: {
+      storeId: params.storeId,
+    },
+  });
+
   const stockHistories = await prismadb.stockHistory.findMany({
     where: {
       productId: params.productId,
-    },
-    include: {
-      size: true,
-      color: true,
     },
     orderBy: {
       createdAt: 'desc'
@@ -100,25 +98,20 @@ const ProductPage = async ({
       <div className="flex-1 space-y-4 p-8 pt-6">
         <ProductForm 
           categories={categories}
-          brands={brands}
-          descriptions={descriptions}
           sizes={sizes}
           colors={colors}
-          initialData={product}
+          brands={brands}
+          descriptions={descriptions}
+          initialData={transformedProduct}
         />
         <Separator />
-        {product && (
+        {transformedProduct && (
           <>
             <StockManagement
-              initialVariations={product.productSizes.map((ps, index) => ({
-                id: ps.id,
-                size: ps.size,
-                color: product.productColors[index]?.color || { id: '', name: 'N/A', value: '', createdAt: new Date(), updatedAt: new Date() },
-                stock: ps.stock
-              }))}
               productId={params.productId}
               storeId={params.storeId}
               userId={userId}
+              currentStock={transformedProduct.stock ?? 0}
             />
             <Separator />
             <StockHistory
@@ -129,9 +122,7 @@ const ProductPage = async ({
                 changeType: history.changeType,
                 reason: history.reason,
                 createdAt: history.createdAt,
-                createdBy: history.createdBy,
-                size: history.size ? { name: history.size.name } : { name: 'N/A' },
-                color: history.color ? { name: history.color.name } : { name: 'N/A' }
+                createdBy: history.createdBy
               }))}
             />
           </>

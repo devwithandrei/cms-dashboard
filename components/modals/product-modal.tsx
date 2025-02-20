@@ -12,7 +12,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ProductVariationsSelector } from '@/components/store/product-variations-selector';
 import { useCart } from '@/hooks/use-cart';
 import { Input } from '@/components/ui/input';
 import Image from 'next/image';
@@ -95,16 +94,33 @@ export const ProductModal: React.FC<ProductModalProps> = ({
               <div className="text-2xl font-bold">
                 {formatter.format(product.price.toNumber())}
               </div>
-              <ProductVariationsSelector
-                variations={product.productSizes.map((ps, index) => ({
-                  sizeId: ps.sizeId,
-                  colorId: product.productColors[index]?.colorId || '',
-                  stock: ps.stock,
-                  size: ps.size,
-                  color: product.productColors[index]?.color || { id: '', name: 'N/A', value: '', createdAt: new Date(), updatedAt: new Date() }
-                }))}
-                onVariationSelect={setSelectedVariation}
-              />
+              <div className="space-y-4">
+                {product.productSizes.map((ps, index) => {
+                  const pc = product.productColors[index];
+                  return (
+                    <div 
+                      key={ps.id}
+                      className={`p-4 border rounded-lg cursor-pointer ${
+                        selectedVariation?.id === ps.id ? 'border-black' : ''
+                      }`}
+                      onClick={() => setSelectedVariation({
+                        id: ps.id,
+                        size: ps.size,
+                        color: pc?.color,
+                        stock: ps.stock
+                      })}
+                    >
+                      <div className="flex justify-between">
+                        <div>Size: {ps.size.name}</div>
+                        <div>Color: {pc?.color.name || 'N/A'}</div>
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        Stock: {ps.stock}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
               <div>
                 <Input
                   type="number"

@@ -34,16 +34,18 @@ const formSchema = z.object({
   name: z.string().min(1),
   images: z.object({ url: z.string() }).array(),
   price: z.coerce.number().min(1),
+  stock: z.coerce.number().min(0),
   categoryId: z.string().min(1),
   brandId: z.string().min(1),
   descriptionId: z.string().min(1),
   isFeatured: z.boolean().default(false).optional(),
   isArchived: z.boolean().default(false).optional(),
-  variations: z.array(z.object({
-    sizeId: z.string().min(1),
-    colorId: z.string().min(1),
-    stock: z.coerce.number().min(0)
-  }))
+  sizes: z.array(z.object({
+    sizeId: z.string().optional()
+  })).optional(),
+  colors: z.array(z.object({
+    colorId: z.string().optional()
+  })).optional()
 });
 
 type ProductFormValues = z.infer<typeof formSchema>
@@ -83,25 +85,25 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       descriptionId: initialData?.descriptionId || '',
       isFeatured: initialData?.isFeatured || false,
       isArchived: initialData?.isArchived || false,
-      variations: initialData.productSizes.map((ps, index) => ({
-        sizeId: ps.sizeId,
-        colorId: initialData.productColors[index]?.colorId || '',
-        stock: ps.stock
+      stock: initialData?.stock || 0,
+      sizes: initialData.productSizes.map((ps) => ({
+        sizeId: ps.sizeId
+      })),
+      colors: initialData.productColors.map((pc) => ({
+        colorId: pc.colorId
       }))
     } : {
       name: '',
       images: [],
       price: 0,
+      stock: 0,
       categoryId: '',
       brandId: '',
       descriptionId: '',
       isFeatured: false,
       isArchived: false,
-      variations: [{
-        sizeId: '',
-        colorId: '',
-        stock: 0
-      }]
+      sizes: [],
+      colors: []
     }
   });
 
@@ -155,21 +157,30 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     }
   }
 
-  const addVariation = () => {
-    const currentVariations = form.getValues('variations');
-    form.setValue('variations', [
-      ...currentVariations,
-      { sizeId: '', colorId: '', stock: 0 }
+  const addSize = () => {
+    const currentSizes = form.getValues('sizes') || [];
+    form.setValue('sizes', [
+      ...currentSizes,
+      { sizeId: '' }
     ]);
   };
 
-  const removeVariation = (index: number) => {
-    const currentVariations = form.getValues('variations');
-    if (currentVariations.length > 1) {
-      form.setValue('variations', currentVariations.filter((_, i) => i !== index));
-    } else {
-      toast.error('At least one variation is required');
-    }
+  const addColor = () => {
+    const currentColors = form.getValues('colors') || [];
+    form.setValue('colors', [
+      ...currentColors,
+      { colorId: '' }
+    ]);
+  };
+
+  const removeSize = (index: number) => {
+    const currentSizes = form.getValues('sizes') || [];
+    form.setValue('sizes', currentSizes.filter((_, i) => i !== index));
+  };
+
+  const removeColor = (index: number) => {
+    const currentColors = form.getValues('colors') || [];
+    form.setValue('colors', currentColors.filter((_, i) => i !== index));
   };
 
   const handleCheckboxChange = (field: any, checked: CheckedState) => {
@@ -247,6 +258,19 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             />
             <FormField
               control={form.control}
+              name="stock"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Stock</FormLabel>
+                  <FormControl>
+                    <Input type="number" disabled={loading} placeholder="0" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
               name="categoryId"
               render={({ field }) => (
                 <FormItem>
@@ -312,36 +336,38 @@ export const ProductForm: React.FC<ProductFormProps> = ({
               )}
             />
           </div>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Heading title="Variations" description="Add size and color variations with stock levels" />
-              <Button 
-                type="button" 
-                onClick={addVariation} 
-                className="text-xs md:text-sm text-gray-600 dark:text-gray-300"
-              >
-                Add Variation
-              </Button>
-            </div>
+          <div className="space-y-8">
+            {/* Sizes Section */}
             <div className="space-y-4">
-              {form.watch('variations').map((_, index) => (
-                <div key={index} className="flex flex-col space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="relative">
+              <div className="flex items-center justify-between">
+                <Heading title="Sizes" description="Add available sizes for this product (optional)" />
+                <Button 
+                  type="button" 
+                  onClick={addSize}
+                  variant="outline"
+                  size="sm"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Size
+                </Button>
+              </div>
+              <div className="space-y-4">
+                {form.watch('sizes')?.map((_, index) => (
+                  <div key={index} className="flex items-center gap-4">
+                    <div className="flex-1">
                       <FormField
                         control={form.control}
-                        name={`variations.${index}.sizeId`}
+                        name={`sizes.${index}.sizeId`}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Size</FormLabel>
                             <Select 
                               disabled={loading} 
                               onValueChange={field.onChange} 
-                              value={field.value} 
+                              value={field.value || ''} 
                               defaultValue={field.value}
                             >
                               <FormControl>
-                                <SelectTrigger className="w-full">
+                                <SelectTrigger>
                                   <SelectValue defaultValue={field.value} placeholder="Select a size" />
                                 </SelectTrigger>
                               </FormControl>
@@ -356,21 +382,50 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                         )}
                       />
                     </div>
-                    <div className="relative">
+                    <Button
+                      type="button"
+                      onClick={() => removeSize(index)}
+                      variant="destructive"
+                      size="sm"
+                    >
+                      <Trash className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Colors Section */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Heading title="Colors" description="Add available colors for this product (optional)" />
+                <Button 
+                  type="button" 
+                  onClick={addColor}
+                  variant="outline"
+                  size="sm"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Color
+                </Button>
+              </div>
+              <div className="space-y-4">
+                {form.watch('colors')?.map((_, index) => (
+                  <div key={index} className="flex items-center gap-4">
+                    <div className="flex-1">
                       <FormField
                         control={form.control}
-                        name={`variations.${index}.colorId`}
+                        name={`colors.${index}.colorId`}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Color</FormLabel>
                             <Select 
                               disabled={loading} 
                               onValueChange={field.onChange} 
-                              value={field.value} 
+                              value={field.value || ''} 
                               defaultValue={field.value}
                             >
                               <FormControl>
-                                <SelectTrigger className="w-full">
+                                <SelectTrigger>
                                   <SelectValue defaultValue={field.value} placeholder="Select a color" />
                                 </SelectTrigger>
                               </FormControl>
@@ -385,40 +440,17 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                         )}
                       />
                     </div>
-                    <div className="relative">
-                      <FormField
-                        control={form.control}
-                        name={`variations.${index}.stock`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Stock</FormLabel>
-                            <FormControl>
-                              <Input 
-                                type="number" 
-                                disabled={loading} 
-                                placeholder="0" 
-                                {...field} 
-                                className="w-full"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
+                    <Button
+                      type="button"
+                      onClick={() => removeColor(index)}
+                      variant="destructive"
+                      size="sm"
+                    >
+                      <Trash className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <Button 
-                    type="button" 
-                    variant="destructive" 
-                    size="sm"
-                    onClick={() => removeVariation(index)}
-                    className="ml-auto"
-                  >
-                    Remove Variation
-                  </Button>
-                  <Separator className="my-4" />
-                </div>
-              ))} 
+                ))}
+              </div>
             </div>
           </div>
           <div className="md:grid md:grid-cols-3 gap-8">

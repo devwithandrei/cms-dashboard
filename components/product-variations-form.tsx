@@ -18,7 +18,6 @@ import { Card } from '@/components/ui/card';
 interface ProductVariation {
   sizeId?: string;
   colorId?: string;
-  stock: number;
 }
 
 interface ProductVariationsFormProps {
@@ -41,12 +40,12 @@ export const ProductVariationsForm: React.FC<ProductVariationsFormProps> = ({
   const addVariation = () => {
     setVariations(prev => [
       ...prev,
-      { sizeId: undefined, colorId: undefined, stock: 0 }
+      { sizeId: undefined, colorId: undefined }
     ]);
-    onVariationsChangeAction([...variations, { sizeId: undefined, colorId: undefined, stock: 0 }]);
+    onVariationsChangeAction([...variations, { sizeId: undefined, colorId: undefined }]);
   };
 
-  const updateVariation = (index: number, field: keyof ProductVariation, value: string | number | undefined) => {
+  const updateVariation = (index: number, field: keyof ProductVariation, value: string | undefined) => {
     const updatedVariations = variations.map((variation, i) => {
       if (i === index) {
         return {
@@ -65,12 +64,7 @@ export const ProductVariationsForm: React.FC<ProductVariationsFormProps> = ({
     const updatedVariations = variations.filter((_, i) => i !== index);
     setVariations(updatedVariations);
     onVariationsChangeAction(updatedVariations);
-    
-    // If all variations are removed, call the action if needed
-    if (updatedVariations.length === 0) {
-      // Optionally call a function here to handle the removal of all variations
-      // onAllVariationsRemovedAction(); // Uncomment if needed
-    }
+    onRemoveVariationAction(index);
   };
 
   return (
@@ -90,7 +84,7 @@ export const ProductVariationsForm: React.FC<ProductVariationsFormProps> = ({
       <div className="space-y-4">
         {variations.map((variation, index) => (
           <Card key={index} className="p-4">
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               {sizes.length > 0 && (
                 <div className="col-span-1">
                   <Label>Size (Optional)</Label>
@@ -133,16 +127,7 @@ export const ProductVariationsForm: React.FC<ProductVariationsFormProps> = ({
                   </Select>
                 </div>
               )}
-              <div className="col-span-1">
-                <Label>Stock</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  value={variation.stock}
-                  onChange={(e) => updateVariation(index, 'stock', parseInt(e.target.value, 10))}
-                />
-              </div>
-              <div className="col-span-1 flex items-end">
+              <div className="col-span-2 flex justify-end">
                 <Button
                   type="button"
                   variant="destructive"

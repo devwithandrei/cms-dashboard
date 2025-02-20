@@ -21,37 +21,13 @@ export const getStockCount = async (storeId: string) => {
       storeId,
       isArchived: false,
     },
-    include: {
-      productSizes: {
-        select: {
-          stock: true,
-        },
-      },
-      productColors: {
-        select: {
-          stock: true,
-        },
-      },
-    },
+    select: {
+      stock: true
+    }
   });
 
-  let totalStock = 0;
-
-  for (const product of products as unknown as Product[]) {
-    if (product.productSizes.length === 0 && product.productColors.length === 0) {
-      // If product has no variations, use its base stock
-      totalStock += product.stock || 0;
-    } else if (product.productSizes.length > 0 && product.productColors.length === 0) {
-      // If product has only sizes
-      totalStock += product.productSizes.reduce((sum: number, size: ProductSize) => sum + size.stock, 0);
-    } else if (product.productSizes.length === 0 && product.productColors.length > 0) {
-      // If product has only colors
-      totalStock += product.productColors.reduce((sum: number, color: ProductColor) => sum + color.stock, 0);
-    } else {
-      // If product has both sizes and colors, use size stock as it represents the actual inventory
-      totalStock += product.productSizes.reduce((sum: number, size: ProductSize) => sum + size.stock, 0);
-    }
-  }
+  // Sum up all base product stocks, matching how it's shown in the product list
+  const totalStock = products.reduce((sum, product) => sum + (product.stock || 0), 0);
 
   return totalStock;
 };

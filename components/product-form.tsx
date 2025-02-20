@@ -1,15 +1,17 @@
 'use client';
 
 import * as z from 'zod';
+import axios from 'axios';
 import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { toast } from 'react-hot-toast';
 import { Trash } from 'lucide-react';
-import { Category, Size, Color, Product, Brand, Description } from '@/types';
+import { Category, Color, Image, Product as PrismaProduct, Size, Brand, Description } from '@prisma/client';
+import { useParams, useRouter } from 'next/navigation';
+
+import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Heading } from '@/components/ui/heading';
-import { Separator } from '@/components/ui/separator';
 import {
   Form,
   FormControl,
@@ -19,21 +21,72 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import ImageUpload from '@/components/ui/image-upload';
+import { Separator } from '@/components/ui/separator';
+import { Heading } from '@/components/ui/heading';
 import { AlertModal } from '@/components/modals/alert-modal';
-import ProductVariationsForm from '@/components/product-variations-form';
-import axios from 'axios';
-import { useParams, useRouter } from 'next/navigation';
-import { ProductVariation } from '@/types';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import ImageUpload from '@/components/ui/image-upload';
+import { Checkbox } from '@/components/ui/checkbox';
+
+interface ProductFormValues {
+  name: string;
+  images: { url: string }[];
+  price: number;
+  categoryId: string;
+  brandId: string;
+  descriptionId: string;
+  isFeatured: boolean;
+  isArchived: boolean;
+}
+
+type ProductSize = {
+  id: string;
+  productId: string;
+  sizeId: string;
+  size: {
+    id: string;
+    name: string;
+    value: string;
+    storeId: string;
+    createdAt: Date;
+    updatedAt: Date;
+  };
+  stock: number;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type ProductColor = {
+  id: string;
+  productId: string;
+  colorId: string;
+  color: {
+    id: string;
+    name: string;
+    value: string;
+    storeId: string;
+    createdAt: Date;
+    updatedAt: Date;
+  };
+  stock: number;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+interface ExtendedProduct extends PrismaProduct {
+  images: Image[];
+  productSizes: ProductSize[];
+  productColors: ProductColor[];
+}
+
+interface ProductFormProps {
+  categories: Category[];
+  sizes: Size[];
+  colors: Color[];
+  brands: Brand[];
+  descriptions: Description[];
+  initialData: ExtendedProduct | null;
+};
 
 const formSchema = z.object({
   name: z.string().min(1),
@@ -41,44 +94,42 @@ const formSchema = z.object({
   price: z.coerce.number().min(1),
   categoryId: z.string().min(1),
   brandId: z.string().min(1),
-  descriptionId: z.string().optional(),
-  isFeatured: z.boolean().default(false).optional(),
-  isArchived: z.boolean().default(false).optional(),
-  stock: z.coerce.number().min(0),
-  variations: z.array(z.object({
-    sizeId: z.string().optional(), // Optional without min validation
-    colorId: z.string().optional(), // Optional without min validation
-    stock: z.coerce.number().min(0),
-  })).optional(),
+  descriptionId: z.string().min(1),
+  isFeatured: z.boolean().default(false),
+  isArchived: z.boolean().default(false),
 });
-
-type ProductFormValues = z.infer<typeof formSchema>;
-
-interface ProductFormProps {
-  initialData: Product | null;
-  categories: Category[];
-  sizes: Size[];
-  colors: Color[];
-  brands: Brand[];
-  descriptions: Description[];
-}
 
 export const ProductForm: React.FC<ProductFormProps> = ({
   initialData,
   categories,
+  brands,
   sizes,
   colors,
-  brands,
   descriptions,
 }) => {
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [showVariations, setShowVariations] = useState(!!initialData?.productSizes?.length || !!initialData?.productColors?.length);
-  const [stock, setStock] = useState(initialData ? initialData.stock || 0 : 0);
-  const [variations, setVariations] = useState(initialData ? (initialData.productSizes || initialData.productColors) : []);
-
   const params = useParams();
   const router = useRouter();
+
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [stock, setStock] = useState(initialData ? initialData.stock || 0 : 0);
+  const [sizeSelections, setSizeSelections] = useState<Record<string, boolean>>(() => {
+    if (!initialData?.productSizes) return {};
+    const selections: Record<string, boolean> = {};
+    initialData.productSizes.forEach(ps => {
+      selections[ps.size.id] = true;
+    });
+    return selections;
+  });
+
+  const [colorSelections, setColorSelections] = useState<Record<string, boolean>>(() => {
+    if (!initialData?.productColors) return {};
+    const selections: Record<string, boolean> = {};
+    initialData.productColors.forEach(pc => {
+      selections[pc.color.id] = true;
+    });
+    return selections;
+  });
 
   const title = initialData ? 'Edit product' : 'Create product';
   const description = initialData ? 'Edit a product.' : 'Add a new product';
@@ -91,26 +142,9 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     price: parseFloat(String(initialData?.price)),
     categoryId: initialData.categoryId,
     brandId: initialData.brandId,
-    descriptionId: initialData.descriptionId,
+    descriptionId: initialData.descriptionId || '',
     isFeatured: initialData.isFeatured,
     isArchived: initialData.isArchived,
-    stock: initialData.stock,
-    variations: (initialData.productSizes || initialData.productColors)
-      ? (initialData.productSizes || initialData.productColors || [])
-          .map(
-            (variation: any, index: number): ProductVariation => ({
-              sizeId:
-                initialData.productSizes && initialData.productSizes[index]
-                  ? initialData.productSizes[index].sizeId
-                  : undefined,
-              colorId:
-                initialData.productColors && initialData.productColors[index]
-                  ? initialData.productColors[index].colorId
-                  : undefined,
-              stock: variation.stock, // Include the stock property
-            })
-          )
-      : [],
   } : {
     name: '',
     images: [],
@@ -120,8 +154,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     descriptionId: '',
     isFeatured: false,
     isArchived: false,
-    stock: 0,
-    variations: []
   };
 
   const form = useForm<ProductFormValues>({
@@ -129,50 +161,46 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     defaultValues
   });
 
-  const handleAddVariation = () => {
-    setShowVariations(true);
-  };
-
-  const handleRemoveVariation = (index: number) => {
-    const updatedVariations = variations.filter((_, i) => i !== index);
-    setVariations(updatedVariations);
-  };
-
   const onSubmit = async (data: ProductFormValues) => {
     try {
       setLoading(true);
+      console.log('Current size selections:', sizeSelections);
+      console.log('Current color selections:', colorSelections);
 
-      const storeId = params?.storeId;
-      const productId = params?.productId;
+      // Transform sizes and colors into arrays of IDs
+      const sizeIds = Object.entries(sizeSelections)
+        .filter(([_, selected]) => selected)
+        .map(([id]) => id);
 
-      if (!storeId) {
-        toast.error('Store ID is missing.');
-        return;
-      }
+      const colorIds = Object.entries(colorSelections)
+        .filter(([_, selected]) => selected)
+        .map(([id]) => id);
 
-      if (initialData && !productId) {
-        toast.error('Product ID is missing.');
-        return;
-      }
+      console.log('Transformed sizeIds:', sizeIds);
+      console.log('Transformed colorIds:', colorIds);
 
       const submissionData = {
         ...data,
         stock,
-        variations: data.variations, // Allow empty variations
+        sizes: sizeIds.map(id => ({ sizeId: id })),
+        colors: colorIds.map(id => ({ colorId: id })),
       };
 
-      if (initialData && productId) {
-        await axios.patch(`/api/${storeId}/products/${productId}`, submissionData);
+      console.log('Submitting data:', submissionData);
+
+      if (initialData) {
+        const response = await axios.patch(`/api/${params.storeId}/products/${params.productId}`, submissionData);
+        console.log('Update response:', response.data);
       } else {
-        await axios.post(`/api/${storeId}/products`, submissionData);
+        const response = await axios.post(`/api/${params.storeId}/products`, submissionData);
+        console.log('Create response:', response.data);
       }
 
       router.refresh();
-      if (storeId) {
-        router.push(`/${storeId}/products`);
-      }
+      router.push(`/${params.storeId}/products`);
       toast.success(toastMessage);
-    } catch (error: any) {
+    } catch (error) {
+      console.error('Error submitting form:', error);
       toast.error('Something went wrong.');
     } finally {
       setLoading(false);
@@ -182,15 +210,11 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   const onDelete = async () => {
     try {
       setLoading(true);
-      if (!params || !params.storeId || !params.productId) {
-        toast.error('Missing store or product ID.');
-        return;
-      }
       await axios.delete(`/api/${params.storeId}/products/${params.productId}`);
       router.refresh();
       router.push(`/${params.storeId}/products`);
       toast.success('Product deleted.');
-    } catch (error: any) {
+    } catch (error) {
       toast.error('Something went wrong.');
     } finally {
       setLoading(false);
@@ -267,6 +291,18 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 </FormItem>
               )}
             />
+            <div>
+              <FormLabel>Stock</FormLabel>
+              <FormControl>
+                <Input
+                  type="number"
+                  disabled={loading}
+                  placeholder="0"
+                  value={stock}
+                  onChange={(e) => setStock(parseInt(e.target.value) || 0)}
+                />
+              </FormControl>
+            </div>
             <FormField
               control={form.control}
               name="categoryId"
@@ -281,9 +317,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                     </FormControl>
                     <SelectContent>
                       {categories.map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.name}
-                        </SelectItem>
+                        <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -305,9 +339,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                     </FormControl>
                     <SelectContent>
                       {brands.map((brand) => (
-                        <SelectItem key={brand.id} value={brand.id}>
-                          {brand.name}
-                        </SelectItem>
+                        <SelectItem key={brand.id} value={brand.id}>{brand.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -318,7 +350,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             <FormField
               control={form.control}
               name="descriptionId"
-              render={({ field }: { field: any }) => (
+              render={({ field }) => (
                 <FormItem>
                   <FormLabel>Description</FormLabel>
                   <Select disabled={loading} onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
@@ -329,9 +361,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                     </FormControl>
                     <SelectContent>
                       {descriptions.map((description) => (
-                        <SelectItem key={description.id} value={description.id}>
-                          {description.name}
-                        </SelectItem>
+                        <SelectItem key={description.id} value={description.id}>{description.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -339,6 +369,72 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 </FormItem>
               )}
             />
+          </div>
+          <div>
+            <div className="mb-4">
+              <Heading title="Sizes" description="Select available sizes for this product (optional)" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              {sizes?.map((size) => (
+                <div key={size.id} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={size.id}
+                    checked={!!sizeSelections[size.id]}
+                    onCheckedChange={(checked) => {
+                      console.log('Size checkbox changed:', size.id, checked);
+                      setSizeSelections(prev => {
+                        const next = {
+                          ...prev,
+                          [size.id]: checked === true
+                        };
+                        console.log('New size selections:', next);
+                        return next;
+                      });
+                    }}
+                  />
+                  <label
+                    htmlFor={size.id}
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    {size.name}
+                  </label>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div className="mb-4">
+              <Heading title="Colors" description="Select available colors for this product (optional)" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              {colors?.map((color) => (
+                <div key={color.id} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={color.id}
+                    checked={!!colorSelections[color.id]}
+                    onCheckedChange={(checked) => {
+                      console.log('Color checkbox changed:', color.id, checked);
+                      setColorSelections(prev => {
+                        const next = {
+                          ...prev,
+                          [color.id]: checked === true
+                        };
+                        console.log('New color selections:', next);
+                        return next;
+                      });
+                    }}
+                  />
+                  <label
+                    htmlFor={color.id}
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    {color.name}
+                  </label>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="md:grid md:grid-cols-3 gap-8">
             <FormField
               control={form.control}
               name="isFeatured"
@@ -347,7 +443,9 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                   <FormControl>
                     <Checkbox
                       checked={field.value}
-                      onCheckedChange={(checked) => field.onChange(!!checked)}
+                      onCheckedChange={(checked) => {
+                        field.onChange(checked === true);
+                      }}
                     />
                   </FormControl>
                   <div className="space-y-1 leading-none">
@@ -369,7 +467,9 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                   <FormControl>
                     <Checkbox
                       checked={field.value}
-                      onCheckedChange={(checked) => field.onChange(!!checked)}
+                      onCheckedChange={(checked) => {
+                        field.onChange(checked === true);
+                      }}
                     />
                   </FormControl>
                   <div className="space-y-1 leading-none">
@@ -383,56 +483,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="stock"
-              render={() => (
-                <FormItem>
-                  <FormLabel>Stock</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={stock}
-                      onChange={(e) => setStock(parseInt(e.target.value) || 0)}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <div className="space-y-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleAddVariation}
-              >
-                Add Variation
-              </Button>
-              {showVariations && (
-                <FormField
-                  control={form.control}
-                  name="variations"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Product Variations</FormLabel>
-                      <FormControl>
-                        <ProductVariationsForm
-                          sizes={sizes}
-                          colors={colors}
-                          existingVariations={field.value || []}
-                          onVariationsChangeAction={field.onChange}
-                          onRemoveVariationAction={handleRemoveVariation}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-            </div>
           </div>
-          <Separator />
           <Button disabled={loading} className="ml-auto" type="submit">
             {action}
           </Button>
@@ -441,5 +492,3 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     </>
   );
 };
-
-export default ProductForm;

@@ -5,47 +5,25 @@ import { toast } from 'react-hot-toast';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { 
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent } from '@/components/ui/card';
 
 interface StockManagementProps {
-  initialVariations: {
-    id: string;
-    size: { id: string; name: string };
-    color: { id: string; name: string };
-    stock: number;
-  }[];
+  currentStock: number;
   productId: string;
   storeId: string;
   userId: string;
 }
 
 export const StockManagement: React.FC<StockManagementProps> = ({
-  initialVariations,
+  currentStock,
   productId,
   storeId,
   userId
 }) => {
-  const [variations, setVariations] = useState(initialVariations);
+  const [newStock, setNewStock] = useState(currentStock);
   const [loading, setLoading] = useState(false);
   const [reason, setReason] = useState('');
-
-  const onStockChange = (variationId: string, newStock: number) => {
-    setVariations(current => 
-      current.map(variation => 
-        variation.id === variationId 
-          ? { ...variation, stock: newStock }
-          : variation
-      )
-    );
-  };
 
   const onSave = async () => {
     if (!reason.trim()) {
@@ -56,13 +34,13 @@ export const StockManagement: React.FC<StockManagementProps> = ({
     try {
       setLoading(true);
       
-      const response = await fetch(`/api/${storeId}/products/${productId}/variations`, {
+      const response = await fetch(`/api/${storeId}/products/${productId}/stock`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          variations,
+          newStock,
           reason,
           userId,
           changeType: 'manual'
@@ -86,47 +64,41 @@ export const StockManagement: React.FC<StockManagementProps> = ({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-medium">Stock Management</h2>
-        <Button onClick={onSave} disabled={loading || !reason.trim()}>
+        <Button onClick={onSave} disabled={loading || !reason.trim() || newStock === currentStock}>
           Save Changes
         </Button>
       </div>
 
-      <div className="space-y-4">
-        <Textarea
-          placeholder="Reason for stock change (required)"
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-        />
-      </div>
-
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Size</TableHead>
-            <TableHead>Color</TableHead>
-            <TableHead>Current Stock</TableHead>
-            <TableHead>New Stock</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {variations.map((variation) => (
-            <TableRow key={variation.id}>
-              <TableCell>{variation.size?.name || 'N/A'}</TableCell>
-              <TableCell>{variation.color?.name || 'N/A'}</TableCell>
-              <TableCell>{variation.stock}</TableCell>
-              <TableCell>
-                <Input
-                  type="number"
-                  min="0"
-                  value={variation.stock}
-                  onChange={(e) => onStockChange(variation.id, parseInt(e.target.value, 10))}
-                  className="w-24"
-                />
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      <Card>
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium">Current Stock</label>
+              <div className="mt-1 text-2xl font-semibold">{currentStock}</div>
+            </div>
+            <div>
+              <label className="text-sm font-medium">New Stock</label>
+              <Input
+                type="number"
+                min="0"
+                value={newStock}
+                onChange={(e) => setNewStock(parseInt(e.target.value, 10))}
+                className="mt-1"
+              />
+            </div>
+          </div>
+          
+          <div className="mt-4">
+            <label className="text-sm font-medium">Reason for Change</label>
+            <Textarea
+              placeholder="Reason for stock change (required)"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              className="mt-1"
+            />
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
