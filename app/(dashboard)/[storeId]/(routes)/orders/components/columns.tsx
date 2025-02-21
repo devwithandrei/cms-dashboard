@@ -6,25 +6,28 @@ export type OrderColumn = {
   id: string;
   phone: string;
   address: string;
+  isPaid: boolean;
+  products: string;
+  totalPrice: string;
+  status: 'pending' | 'paid' | 'delivered' | 'canceled';
+  createdAt: string;
+  customerEmail: string;
+  customerName: string;
   city: string;
   country: string;
   postalCode: string;
-  email: string;
-  paidProducts: string; // For paid products
-  unpaidProducts: string; // For unpaid products
-  totalPrice: string;
-  createdAt: string;
-}
+  orderItems?: {
+    id: string;
+    productId: string;
+    quantity: number;
+    price: string;
+    size?: { id: string; name: string } | null;
+    color?: { id: string; name: string } | null;
+  }[];
+};
+
 
 export const columns: ColumnDef<OrderColumn>[] = [
-  {
-    accessorKey: "paidProducts", // New column for paid products
-    header: "Paid Products",
-  },
-  {
-    accessorKey: "unpaidProducts", // New column for unpaid products
-    header: "Unpaid Products",
-  },
   {
     accessorKey: "phone",
     header: "Phone",

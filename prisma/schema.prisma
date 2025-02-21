@@ -113,25 +113,20 @@ model ProductColor {
 }
 
 model Order {
-  id             String      @id @default(uuid())
-  storeId        String
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-  isPaid         Boolean     @default(false)
-  address        String
-  phone          String
-  city           String
-  country        String
-  customerEmail  String
-  customerName   String
-  postalCode     String
-  shippingMethod String?
-  status         String      @default("pending")
-  trackingNumber String?
-  store          Store       @relation("StoreToOrder", fields: [storeId], references: [id])
-  orderItems     OrderItem[]
+  id              String    @id @default(auto()) @map("_id") @db.ObjectId
+  storeId         String    @db.ObjectId
+  store           Store     @relation("StoreToOrder", fields: [storeId], references: [id])
+  orderItems      Json
+  amount          Float
+  status          String    @default("pending")
+  paymentIntentId String?
+  paymentStatus   String?
+  customerDetails Json
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([storeId])
+  @@index([status])
 }
 
 model OrderItem {

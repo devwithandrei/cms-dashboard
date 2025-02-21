@@ -26,61 +26,59 @@ export async function POST(req: Request) {
 
   if (event.type === "payment_intent.succeeded") {
     const paymentIntent = event.data.object as Stripe.PaymentIntent;
-    const orderId = paymentIntent.metadata?.orderId;
+    const customerDetails = paymentIntent.metadata?.customerDetails 
+      ? JSON.parse(paymentIntent.metadata.customerDetails)
+      : null;
+    const items = paymentIntent.metadata?.items 
+      ? JSON.parse(paymentIntent.metadata.items)
+      : [];
 
-    const order = await prismadb.order.update({
-      where: {
-        id: orderId,
-      },
-      data: {
-        isPaid: true,
-        status: 'processing'
-      },
-    });
+    try {
+      // Create order
+      const order = await prismadb.order.create({
+        data: {
+          storeId: process.env.STORE_ID!, // Make sure to set this in your environment
+          isPaid: true,
+          status: 'paid',
+          phone: customerDetails?.phone || '',
+          address: customerDetails?.address || '',
+          customerEmail: customerDetails?.email || '',
+          customerName: customerDetails?.name || '',
+          city: customerDetails?.city || '',
+          country: customerDetails?.country || '',
+          postalCode: customerDetails?.postalCode || '',
+          orderItems: {
+            create: items.map((item: any) => ({
+              productId: item.id,
+              quantity: item.quantity,
+              price: item.price,
+              sizeId: item.size || null,
+              colorId: item.color || null,
+            }))
+          }
+        },
+      });
 
-    // Update stock for each order item
-    const orderItems = await prismadb.orderItem.findMany({
-      where: {
-        orderId: orderId,
-      },
-      include: {
-        product: true,
-      },
-    });
-
-    for (const orderItem of orderItems) {
-      try {
+      // Update product stock
+      for (const item of items) {
         const product = await prismadb.product.findUnique({
-          where: {
-            id: orderItem.productId,
-          },
+          where: { id: item.id }
         });
 
-        if (!product) {
-          console.error(`Product with id ${orderItem.productId} not found`);
-          continue;
+        if (product && typeof product.stock === 'number') {
+          await prismadb.product.update({
+            where: { id: item.id },
+            data: {
+              stock: Math.max(0, product.stock - (item.quantity || 1))
+            }
+          });
         }
-
-        if (product.stock === null) {
-          console.error(`Product with id ${orderItem.productId} has null stock`);
-          continue;
-        }
-
-        const newStock = product.stock - orderItem.quantity;
-
-        await prismadb.product.update({
-          where: {
-            id: orderItem.productId,
-          },
-          data: {
-            stock: newStock,
-          },
-        });
-
-        console.log(`Updated stock for product ${orderItem.productId} to ${newStock}`);
-      } catch (error: any) {
-        console.error(`Error updating stock for product ${orderItem.productId}: ${error.message}`);
       }
+
+      return new NextResponse(JSON.stringify({ orderId: order.id }), { status: 200 });
+    } catch (error) {
+      console.error('Error processing order:', error);
+      return new NextResponse('Error processing order', { status: 500 });
     }
   }
 
