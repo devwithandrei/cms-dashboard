@@ -1,4 +1,5 @@
 import prismadb from "@/lib/prismadb";
+import { OrderStatus } from "@/types";
 
 interface GraphData {
   name: string;
@@ -9,7 +10,9 @@ export const getGraphRevenue = async (storeId: string): Promise<GraphData[]> => 
   const paidOrders = await prismadb.order.findMany({
     where: {
       storeId,
-      isPaid: true,
+      status: {
+        in: ['PAID', 'DELIVERED'] as OrderStatus[]
+      }
     },
     include: {
       orderItems: {

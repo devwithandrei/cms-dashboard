@@ -6,6 +6,7 @@ import { toast } from "react-hot-toast";
 import { OrderColumn } from "./components/columns";
 import { format } from "date-fns";
 import { useState } from "react";
+import { OrderStatus } from "@/types";
 
 interface OrdersClientProps {
   orders: OrderColumn[];
@@ -14,7 +15,9 @@ interface OrdersClientProps {
 
 const OrdersClient: React.FC<OrdersClientProps> = ({ orders, storeId }) => {
   const router = useRouter();
-  const [orderData, setOrderData] = useState(orders.filter(order => order.isPaid));
+  const [orderData, setOrderData] = useState(orders.filter(order => 
+    order.status === OrderStatus.PAID || order.status === OrderStatus.DELIVERED
+  ));
 
   const deleteOrder = async (orderId: string) => {
     try {
@@ -34,7 +37,7 @@ const OrdersClient: React.FC<OrdersClientProps> = ({ orders, storeId }) => {
     }
   };
 
-  const updateOrderStatus = async (orderId: string, newStatus: 'delivered' | 'canceled') => {
+  const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
     try {
       const response = await axios.patch(`/api/${storeId}/orders/${orderId}`, {
         status: newStatus
@@ -79,8 +82,8 @@ const OrdersClient: React.FC<OrdersClientProps> = ({ orders, storeId }) => {
                 <p className="text-black dark:text-white">
                   <strong>Status:</strong> 
                   <span className={`ml-2 font-semibold ${
-                    order.status === 'delivered' ? 'text-green-600' : 
-                    order.status === 'canceled' ? 'text-red-600' : 
+                    order.status === OrderStatus.DELIVERED ? 'text-green-600' : 
+                    order.status === OrderStatus.CANCELED ? 'text-red-600' : 
                     'text-blue-600'
                   }`}>
                     {order.status}
@@ -91,11 +94,11 @@ const OrdersClient: React.FC<OrdersClientProps> = ({ orders, storeId }) => {
                 <select 
                   className="p-2 border rounded-md bg-white dark:bg-gray-700 text-black dark:text-white"
                   value={order.status}
-                  onChange={(e) => updateOrderStatus(order.id, e.target.value as 'delivered' | 'canceled')}
+                  onChange={(e) => updateOrderStatus(order.id, e.target.value as OrderStatus)}
                 >
-                  <option value="paid">Paid</option>
-                  <option value="delivered">Delivered</option>
-                  <option value="canceled">Canceled</option>
+                  <option value={OrderStatus.PAID}>Paid</option>
+                  <option value={OrderStatus.DELIVERED}>Delivered</option>
+                  <option value={OrderStatus.CANCELED}>Canceled</option>
                 </select>
                 <button
                   onClick={() => deleteOrder(order.id)}

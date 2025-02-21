@@ -2,7 +2,7 @@ import Stripe from "stripe";
 import { NextResponse } from "next/server";
 import { stripe, handleStripeError } from "@/lib/stripe";
 import prismadb from "@/lib/prismadb";
-import { Product, Size, Color } from "@/types";
+import { Product, Size, Color, OrderStatus } from "@/types";
 
 interface ProductSize {
   id: string;
@@ -36,6 +36,13 @@ interface ProductWithStock {
   productColors: ProductColor[];
 }
 
+interface OrderItem {
+  productId: string;
+  quantity: number;
+  sizeId?: string;
+  colorId?: string;
+}
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
@@ -56,11 +63,11 @@ export async function POST(
     const body = await req.json();
     console.log('Request body:', JSON.stringify(body, null, 2));
     
-    const { productIds, sizes, colors, quantities, customerDetails } = body;
+    const { items, customerDetails } = body;
 
-    if (!productIds || productIds.length === 0) {
-      console.log('Missing product IDs');
-      return new NextResponse("Product ids are required", { 
+    if (!items || items.length === 0) {
+      console.log('Missing items');
+      return new NextResponse("Items are required", { 
         status: 400,
         headers: corsHeaders,
       });
@@ -90,30 +97,33 @@ export async function POST(
     }
 
     console.log('Fetching products...');
-    const products = await prismadb.product.findMany({
-      where: {
-        id: {
-          in: productIds
-        }
-      },
-      include: {
-        images: true,
-        productSizes: {
+    const products = await Promise.all(
+      items.map(async (item: OrderItem) => {
+        const product = await prismadb.product.findUnique({
+          where: {
+            id: item.productId,
+          },
           include: {
-            size: true
+            images: true,
+            productSizes: {
+              include: {
+                size: true
+              }
+            },
+            productColors: {
+              include: {
+                color: true
+              }
+            }
           }
-        },
-        productColors: {
-          include: {
-            color: true
-          }
-        }
-      }
-    });
+        });
+        return product;
+      })
+    );
     console.log('Found products:', products.length);
 
-    if (products.length !== productIds.length) {
-      console.log('Some products not found. Requested:', productIds.length, 'Found:', products.length);
+    if (products.length !== items.length) {
+      console.log('Some products not found. Requested:', items.length, 'Found:', products.length);
       return new NextResponse("Some products not found", { 
         status: 400,
         headers: corsHeaders,
@@ -121,13 +131,13 @@ export async function POST(
     }
 
     // Validate stock for each product
-    for (let i = 0; i < productIds.length; i++) {
-      const product = products.find(p => p.id === productIds[i]) as unknown as ProductWithStock;
+    for (let i = 0; i < items.length; i++) {
+      const product = products.find(p => p.id === items[i].productId) as unknown as ProductWithStock;
       if (!product) continue;
 
-      const quantity = quantities[i];
-      const sizeId = sizes[i];
-      const colorId = colors[i];
+      const quantity = items[i].quantity;
+      const sizeId = items[i].sizeId;
+      const colorId = items[i].colorId;
 
       // Check stock based on product type
       if (!sizeId && !colorId) {
@@ -172,7 +182,7 @@ export async function POST(
       console.log('Creating order...');
       const orderData = {
         storeId: params.storeId,
-        isPaid: false,
+        status: OrderStatus.PENDING,
         customerName: customerDetails.name,
         customerEmail: customerDetails.email,
         phone: customerDetails.phone,
@@ -181,34 +191,34 @@ export async function POST(
         country: customerDetails.country,
         postalCode: customerDetails.postalCode,
         orderItems: {
-          create: productIds.map((productId: string, index: number) => {
-            const product = products.find(p => p.id === productId);
-            if (!product) throw new Error(`Product not found: ${productId}`);
+          create: items.map((item: OrderItem, index: number) => {
+            const product = products.find(p => p.id === item.productId);
+            if (!product) throw new Error(`Product not found: ${item.productId}`);
 
             const orderItem: any = {
               product: {
                 connect: {
-                  id: productId
+                  id: item.productId
                 }
               },
-              quantity: quantities[index],
+              quantity: item.quantity,
               price: product.price
             };
 
             // Only include size if it exists and is not empty
-            if (sizes[index] && sizes[index].trim() !== '') {
+            if (item.sizeId && item.sizeId.trim() !== '') {
               orderItem.size = {
                 connect: {
-                  id: sizes[index]
+                  id: item.sizeId
                 }
               };
             }
 
             // Only include color if it exists and is not empty
-            if (colors[index] && colors[index].trim() !== '') {
+            if (item.colorId && item.colorId.trim() !== '') {
               orderItem.color = {
                 connect: {
-                  id: colors[index]
+                  id: item.colorId
                 }
               };
             }
@@ -238,31 +248,30 @@ export async function POST(
       });
       console.log('Order created successfully:', order.id);
 
-      const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
-
-      order.orderItems.forEach((item) => {
-        const itemName = [
-          item.product.name,
-          item.size?.name,
-          item.color?.name
-        ].filter(Boolean).join(' - ');
-
-        line_items.push({
-          quantity: item.quantity,
-          price_data: {
-            currency: 'EUR',
-            product_data: {
-              name: itemName,
-              images: item.product.images.map(img => img.url),
+      const lineItems = products
+        .filter((p): p is Product & { 
+          images: { url: string }[];
+          color: Color | null;
+          size: Size | null;
+        } => p !== null)
+        .map((product, index) => {
+          const item = items[index];
+          return {
+            price_data: {
+              currency: 'USD',
+              product_data: {
+                name: product.name,
+                images: product.images.map((img: { url: string }) => img.url)
+              },
+              unit_amount: Math.round(Number(product.price) * 100)
             },
-            unit_amount: Math.round(Number(item.price) * 100)
-          }
+            quantity: item.quantity
+          };
         });
-      });
 
       console.log('Creating Stripe session...');
       const session = await stripe.checkout.sessions.create({
-        line_items,
+        line_items: lineItems,
         mode: 'payment',
         billing_address_collection: 'required',
         phone_number_collection: {
@@ -277,13 +286,13 @@ export async function POST(
       console.log('Stripe session created:', session.id);
 
       // Update stock after successful order creation
-      for (let i = 0; i < productIds.length; i++) {
-        const product = products.find(p => p.id === productIds[i]) as unknown as ProductWithStock;
+      for (let i = 0; i < items.length; i++) {
+        const product = products.find(p => p.id === items[i].productId) as unknown as ProductWithStock;
         if (!product) continue;
 
-        const quantity = quantities[i];
-        const sizeId = sizes[i];
-        const colorId = colors[i];
+        const quantity = items[i].quantity;
+        const sizeId = items[i].sizeId;
+        const colorId = items[i].colorId;
 
         if (!sizeId && !colorId) {
           // Product without variations
@@ -344,4 +353,3 @@ export async function POST(
     });
   }
 }
-

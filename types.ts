@@ -78,6 +78,13 @@ export type ProductVariation = {
   stock: number;
 }
 
+export enum OrderStatus {
+  PENDING = 'PENDING',
+  PAID = 'PAID',
+  DELIVERED = 'DELIVERED',
+  CANCELED = 'CANCELED',
+}
+
 export type Order = {
   id: string;
   storeId: string;
@@ -89,7 +96,7 @@ export type Order = {
   city: string;
   country: string;
   postalCode: string;
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  status: OrderStatus;
   trackingNumber?: string;
   shippingMethod?: string;
   createdAt: Date;
@@ -108,4 +115,5 @@ export type OrderItem = {
   product: Product;
   size?: Size;
   color?: Color;
+  order: Order;
 };

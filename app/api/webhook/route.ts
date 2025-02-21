@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
+import { OrderStatus } from "@/types";
 
 import prismadb from "@/lib/prismadb";
 
@@ -38,8 +39,7 @@ export async function POST(req: Request) {
       const order = await prismadb.order.create({
         data: {
           storeId: process.env.STORE_ID!, // Make sure to set this in your environment
-          isPaid: true,
-          status: 'paid',
+          status: 'PAID' as OrderStatus,
           phone: customerDetails?.phone || '',
           address: customerDetails?.address || '',
           customerEmail: customerDetails?.email || '',

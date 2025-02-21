@@ -24,25 +24,21 @@ export async function GET(
       },
     });
 
-    const formattedOrders = orders.map((item) => ({
+    const formattedOrders = orders.map((item: any) => ({
       id: item.id,
-      phone: item.phone,
-      address: item.address,
-      city: item.city,
-      country: item.country,
-      postalCode: item.postalCode,
-      email: item.customerEmail,
-      paidProducts: item.orderItems
-        .filter((orderItem) => item.isPaid)
-        .map((orderItem) => orderItem.product.name)
-        .join(", "),
-      unpaidProducts: item.orderItems
-        .filter((orderItem) => !item.isPaid)
-        .map((orderItem) => orderItem.product.name)
+      phone: item.customerDetails?.phone || '',
+      address: item.customerDetails?.address || '',
+      city: item.customerDetails?.city || '',
+      country: item.customerDetails?.country || '',
+      postalCode: item.customerDetails?.postalCode || '',
+      email: item.customerDetails?.email || '',
+      status: item.status,
+      products: item.orderItems
+        .map((orderItem: any) => orderItem.product.name)
         .join(", "),
       totalPrice: formatter.format(
-        item.orderItems.reduce((total, orderItem) => {
-          return total + Number(orderItem.product.price);
+        item.orderItems.reduce((total: number, orderItem: any) => {
+          return total + (Number(orderItem.price) * orderItem.quantity);
         }, 0)
       ),
       createdAt: format(item.createdAt, "MMMM do, yyyy"),

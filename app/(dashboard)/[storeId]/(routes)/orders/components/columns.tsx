@@ -1,21 +1,23 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
+import { OrderStatus } from "@/types";
+import { OrderStatusCell } from "./order-status-cell";
 
 export type OrderColumn = {
   id: string;
   phone: string;
   address: string;
-  isPaid: boolean;
   products: string;
   totalPrice: string;
-  status: 'pending' | 'paid' | 'delivered' | 'canceled';
+  status: OrderStatus;
   createdAt: string;
   customerEmail: string;
   customerName: string;
   city: string;
   country: string;
   postalCode: string;
+  storeId: string;
   orderItems?: {
     id: string;
     productId: string;
@@ -26,8 +28,11 @@ export type OrderColumn = {
   }[];
 };
 
-
 export const columns: ColumnDef<OrderColumn>[] = [
+  {
+    accessorKey: "products",
+    header: "Products",
+  },
   {
     accessorKey: "phone",
     header: "Phone",
@@ -49,11 +54,30 @@ export const columns: ColumnDef<OrderColumn>[] = [
     header: "Postal Code",
   },
   {
-    accessorKey: "email",
-    header: "Email Address",
+    accessorKey: "status",
+    header: "Status",
+    cell: ({ row }) => (
+      <OrderStatusCell
+        initialStatus={row.original.status}
+        orderId={row.original.id}
+        storeId={row.original.storeId}
+      />
+    )
   },
   {
     accessorKey: "totalPrice",
-    header: "Total price",
+    header: "Total Price",
+  },
+  {
+    accessorKey: "createdAt",
+    header: "Created At",
+  },
+  {
+    accessorKey: "customerEmail",
+    header: "Email Address",
+  },
+  {
+    accessorKey: "customerName",
+    header: "Customer Name",
   },
 ];

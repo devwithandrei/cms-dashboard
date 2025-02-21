@@ -112,21 +112,31 @@ model ProductColor {
   @@index([colorId])
 }
 
+enum OrderStatus {
+  PENDING
+  PAID
+  DELIVERED
+  CANCELED
+}
+
 model Order {
-  id              String    @id @default(auto()) @map("_id") @db.ObjectId
-  storeId         String    @db.ObjectId
-  store           Store     @relation("StoreToOrder", fields: [storeId], references: [id])
-  orderItems      Json
-  amount          Float
-  status          String    @default("pending")
-  paymentIntentId String?
-  paymentStatus   String?
-  customerDetails Json
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id              String      @id @default(uuid())
+  storeId         String      
+  store           Store       @relation("StoreToOrder", fields: [storeId], references: [id])
+  orderItems      OrderItem[] 
+  status          OrderStatus @default(PENDING)
+  customerName    String      @default("")
+  customerEmail   String      @default("")
+  phone           String      @default("")
+  address         String      @default("")
+  city            String      @default("")
+  country         String      @default("")
+  postalCode      String      @default("")
+  amount          Float       @default(0)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
   @@index([storeId])
-  @@index([status])
 }
 
 model OrderItem {

@@ -1,15 +1,20 @@
 import { NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
+import { Order, OrderStatus } from '@/types';
 import prismadb from '@/lib/prismadb';
-import { type Order } from '@/types';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, PUT, DELETE, OPTIONS, PATCH',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
-type OrderStatus = 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
-const validOrderStatuses: OrderStatus[] = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+const validOrderStatuses = [
+  OrderStatus.PENDING,
+  OrderStatus.PAID,
+  OrderStatus.DELIVERED,
+  OrderStatus.CANCELED
+];
 
 interface UpdateOrderRequest {
   status?: string;
@@ -146,6 +151,39 @@ export async function PUT(
     return new NextResponse(JSON.stringify(order), { headers: corsHeaders });
   } catch (error) {
     console.log('[ORDER_PUT]', error);
+    return new NextResponse("Internal error", { status: 500, headers: corsHeaders });
+  }
+}
+
+export async function PATCH(
+  req: Request,
+  { params }: { params: { storeId: string; orderId: string } }
+) {
+  try {
+    const { status } = await req.json();
+
+    if (!status) {
+      return new NextResponse("Status is required", { status: 400, headers: corsHeaders });
+    }
+
+    // Validate that status is one of the allowed values
+    if (!validOrderStatuses.includes(status as OrderStatus)) {
+      return new NextResponse("Invalid status value", { status: 400, headers: corsHeaders });
+    }
+
+    const order = await prismadb.order.update({
+      where: {
+        id: params.orderId,
+        storeId: params.storeId,
+      },
+      data: {
+        status: status as OrderStatus,
+      },
+    });
+
+    return new NextResponse(JSON.stringify(order), { headers: corsHeaders });
+  } catch (error) {
+    console.log('[ORDER_PATCH]', error);
     return new NextResponse("Internal error", { status: 500, headers: corsHeaders });
   }
 }
