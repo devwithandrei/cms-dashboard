@@ -1,6 +1,5 @@
 import prismadb from "@/lib/prismadb";
-import { OrderStatus } from "@/types";
-import { Order } from "@prisma/client";
+import { OrderStatus, Order } from "@prisma/client";
 
 export const getTotalRevenue = async (storeId: string) => {
   const paidOrders = await prismadb.order.findMany({
@@ -20,7 +19,7 @@ export const getTotalRevenue = async (storeId: string) => {
   });
 
   const totalRevenue = paidOrders.reduce((total: number, order: Order) => {
-    return total + (order.amount || 0);
+    return total + (order.amount?.toNumber() || 0);
   }, 0);
 
   return totalRevenue;

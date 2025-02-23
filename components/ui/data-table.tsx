@@ -21,19 +21,28 @@ import {
 } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Select } from "@/components/ui/select"
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
-  data: TData[],
-  searchKey: string;
+  data: TData[]
+  searchKey: string
+  placeholder?: string
+  filters?: {
+    key: string
+    options: { label: string; value: string }[]
+  }[]
 }
 
 export function DataTable<TData, TValue>({
   columns,
   data,
   searchKey,
+  placeholder = "Search...",
+  filters
 }: DataTableProps<TData, TValue>) {
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+  
   const table = useReactTable({
     data,
     columns,
@@ -44,19 +53,34 @@ export function DataTable<TData, TValue>({
     state: {
       columnFilters,
     }
-  });
+  })
 
   return (
     <div>
-      <div className="flex items-center py-4">
+      <div className="flex items-center gap-4 py-4">
         <Input
-          placeholder="Search"
+          placeholder={placeholder}
           value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
           onChange={(event) =>
             table.getColumn(searchKey)?.setFilterValue(event.target.value)
           }
           className="max-w-sm"
         />
+        {filters?.map((filter) => (
+          <Select
+            key={filter.key}
+            value={(table.getColumn(filter.key)?.getFilterValue() as string) ?? ""}
+            onValueChange={(value) => 
+              table.getColumn(filter.key)?.setFilterValue(value)
+            }
+          >
+            {filter.options.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+        ))}
       </div>
       <div className="rounded-md border">
         <Table>

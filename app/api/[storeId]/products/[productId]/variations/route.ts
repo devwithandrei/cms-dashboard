@@ -63,17 +63,21 @@ export async function PATCH(
 
       // Create stock history entry based on variation type
       if (sizeVariation) {
+        // Create stock history entry
+        const stockHistoryData = {
+          productId: params.productId,
+          oldStock: sizeVariation.stock,
+          newStock: variation.stock,
+          reason,
+          changeType,
+          quantity: variation.stock - sizeVariation.stock, // Calculate quantity change
+          type: changeType === 'increase' ? 'IN' : 'OUT', // Determine type
+          sizeId: sizeVariation.sizeId,
+          colorId: undefined,
+          createdBy: userId,
+        };
         await prismadb.stockHistory.create({
-          data: {
-            productId: params.productId,
-            oldStock: sizeVariation.stock,
-            newStock: variation.stock,
-            reason,
-            changeType,
-            sizeId: sizeVariation.sizeId,
-            colorId: undefined,
-            createdBy: userId
-          }
+          data: stockHistoryData
         });
 
         // Update size variation stock
@@ -82,17 +86,21 @@ export async function PATCH(
           data: { stock: variation.stock }
         });
       } else if (colorVariation) {
+        // Create stock history entry
+        const stockHistoryData = {
+          productId: params.productId,
+          oldStock: colorVariation.stock,
+          newStock: variation.stock,
+          reason,
+          changeType,
+          quantity: variation.stock - colorVariation.stock, // Calculate quantity change
+          type: changeType === 'increase' ? 'IN' : 'OUT', // Determine type
+          sizeId: undefined,
+          colorId: colorVariation.colorId,
+          createdBy: userId,
+        };
         await prismadb.stockHistory.create({
-          data: {
-            productId: params.productId,
-            oldStock: colorVariation.stock,
-            newStock: variation.stock,
-            reason,
-            changeType,
-            sizeId: undefined,
-            colorId: colorVariation.colorId,
-            createdBy: userId
-          }
+          data: stockHistoryData
         });
 
         // Update color variation stock

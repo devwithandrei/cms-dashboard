@@ -1,12 +1,20 @@
 generator client {
   provider      = "prisma-client-js"
-  binaryTargets = ["native", "debian-openssl-3.0.x"]
+  binaryTargets = ["native"]
 }
 
 datasource db {
   provider     = "mysql"
   url          = env("DATABASE_URL")
   relationMode = "prisma"
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  SHIPPED
+  DELIVERED
+  CANCELLED
 }
 
 model Store {
@@ -54,32 +62,144 @@ model Category {
 }
 
 model Product {
-  id            String         @id @default(uuid())
-  name          String
-  price         Decimal
-  categoryId    String
-  brandId       String
-  descriptionId String?
-  storeId       String
-  stock         Int?          // Base stock for products without variations
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  isArchived    Boolean        @default(false)
-  isFeatured    Boolean        @default(false)
-  store         Store          @relation("StoreToProduct", fields: [storeId], references: [id])
-  category      Category       @relation("CategoryToProduct", fields: [categoryId], references: [id])
-  brand         Brand          @relation(fields: [brandId], references: [id])
-  description   Description?   @relation(fields: [descriptionId], references: [id])
-  images        Image[]
-  orderItems    OrderItem[]
-  productSizes  ProductSize[]
-  productColors ProductColor[]
+  id             String         @id @default(uuid())
+  name           String
+  price          Decimal
+  categoryId     String
+  brandId        String
+  descriptionId  String?
+  storeId        String
+  stock          Int?          // Base stock for products without variations
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  isArchived     Boolean       @default(false)
+  isFeatured     Boolean       @default(false)
+  store          Store         @relation("StoreToProduct", fields: [storeId], references: [id])
+  category       Category      @relation("CategoryToProduct", fields: [categoryId], references: [id])
+  brand          Brand         @relation(fields: [brandId], references: [id])
+  description    Description?  @relation(fields: [descriptionId], references: [id])
+  images         Image[]
+  orderItems     OrderItem[]
+  productSizes   ProductSize[]
+  productColors  ProductColor[]
   stockHistories StockHistory[]
+  wishlistUsers  User[]        @relation("UserToWishlist")
 
   @@index([storeId])
   @@index([categoryId])
   @@index([descriptionId])
   @@index([brandId])
+}
+
+model Order {
+  id             String      @id @default(uuid())
+  storeId        String
+  store          Store       @relation("StoreToOrder", fields: [storeId], references: [id])
+  orderItems     OrderItem[]
+  status         OrderStatus @default(PENDING)
+  phone          String      @default("")
+  address        String      @default("")
+  customerName   String      @default("")
+  customerEmail  String      @default("")
+  city           String      @default("")
+  country        String      @default("")
+  postalCode     String      @default("")
+  amount         Decimal     @default(0)
+  trackingNumber String?
+  shippingMethod String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  user           User        @relation("UserToOrder", fields: [userId], references: [id])
+  userId         String
+  paymentIntentId String?    // Store Stripe payment intent ID
+  isPaid         Boolean     @default(false)
+
+  @@index([storeId])
+  @@index([userId])
+}
+
+model OrderItem {
+  id        String   @id @default(uuid())
+  orderId   String
+  productId String
+  sizeId    String?  // Optional reference to selected size
+  colorId   String?  // Optional reference to selected color
+  order     Order    @relation(fields: [orderId], references: [id])
+  product   Product  @relation(fields: [productId], references: [id])
+  size      Size?    @relation(fields: [sizeId], references: [id])
+  color     Color?   @relation(fields: [colorId], references: [id])
+  quantity  Int      @default(1)
+  price     Decimal  // Store price at time of order
+
+  @@index([orderId])
+  @@index([productId])
+  @@index([sizeId])
+  @@index([colorId])
+}
+
+model Size {
+  id           String        @id @default(uuid())
+  name         String
+  value        String
+  storeId      String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  store        Store         @relation("StoreToSize", fields: [storeId], references: [id])
+  productSizes ProductSize[]
+  orderItems   OrderItem[]
+
+  @@index([storeId])
+}
+
+model Color {
+  id            String         @id @default(uuid())
+  name          String
+  value         String
+  storeId       String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  store         Store          @relation("StoreToColor", fields: [storeId], references: [id])
+  productColors ProductColor[]
+  orderItems    OrderItem[]
+
+  @@index([storeId])
+}
+
+model Brand {
+  id        String    @id @default(uuid())
+  name      String
+  value     String  @default("")
+  storeId   String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  store     Store     @relation("StoreToBrand", fields: [storeId], references: [id])
+  products  Product[]
+
+  @@index([storeId])
+}
+
+model Description {
+  id        String    @id @default(uuid())
+  name      String    @db.Text
+  value     String    @db.Text
+  storeId   String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  store     Store     @relation("StoreToDescription", fields: [storeId], references: [id])
+  products  Product[]
+
+  @@index([storeId])
+}
+
+model Image {
+  id        String   @id @default(uuid())
+  productId String
+  url       String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
 }
 
 model ProductSize {
@@ -112,136 +232,27 @@ model ProductColor {
   @@index([colorId])
 }
 
-enum OrderStatus {
-  PENDING
-  PAID
-  DELIVERED
-  CANCELED
-}
-
-model Order {
-  id              String      @id @default(uuid())
-  storeId         String      
-  store           Store       @relation("StoreToOrder", fields: [storeId], references: [id])
-  orderItems      OrderItem[] 
-  status          OrderStatus @default(PENDING)
-  customerName    String      @default("")
-  customerEmail   String      @default("")
-  phone           String      @default("")
-  address         String      @default("")
-  city            String      @default("")
-  country         String      @default("")
-  postalCode      String      @default("")
-  amount          Float       @default(0)
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-
-  @@index([storeId])
-}
-
-model OrderItem {
-  id        String  @id @default(uuid())
-  orderId   String
-  productId String
-  colorId   String?
-  price     Decimal
-  quantity  Int     @default(1)
-  sizeId    String?
-  order     Order   @relation(fields: [orderId], references: [id])
-  product   Product @relation(fields: [productId], references: [id])
-  size      Size?   @relation(fields: [sizeId], references: [id])
-  color     Color?  @relation(fields: [colorId], references: [id])
-
-  @@index([orderId])
-  @@index([productId])
-  @@index([sizeId])
-  @@index([colorId])
-}
-
-model Size {
-  id           String        @id @default(uuid())
-  name         String
-  storeId      String
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  value        String
-  store        Store         @relation("StoreToSize", fields: [storeId], references: [id])
-  productSizes ProductSize[]
-  orderItems   OrderItem[]
-  stockHistories StockHistory[]
-
-  @@index([storeId])
-}
-
-model Color {
-  id            String         @id @default(uuid())
-  name          String
-  storeId       String
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  value         String
-  store         Store          @relation("StoreToColor", fields: [storeId], references: [id])
-  productColors ProductColor[]
-  orderItems    OrderItem[]
-  stockHistories StockHistory[]
-
-  @@index([storeId])
-}
-
-model Image {
+model StockHistory {
   id        String   @id @default(uuid())
-  url       String
   productId String
+  quantity  Int
+  type      String   // "IN" or "OUT"
+  reason    String?  // e.g., "Purchase", "Sale", "Adjustment"
+  oldStock  Int?
+  newStock  Int?
+  changeType String?
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId])
 }
 
-model Description {
-  id        String    @id @default(uuid())
-  storeId   String
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  name      String
-  value     String
-  store     Store     @relation("StoreToDescription", fields: [storeId], references: [id])
-  products  Product[]
-
-  @@index([storeId])
-}
-
-model Brand {
-  id        String    @id @default(uuid())
-  name      String
-  storeId   String
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  value     String
-  store     Store     @relation("StoreToBrand", fields: [storeId], references: [id])
-  products  Product[]
-
-  @@index([storeId])
-}
-
-model StockHistory {
-  id          String   @id @default(uuid())
-  productId   String
-  oldStock    Int
-  newStock    Int
-  reason      String
-  changeType  String
-  sizeId      String?
-  colorId     String?
-  createdBy   String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  product     Product  @relation(fields: [productId], references: [id])
-  size        Size?    @relation(fields: [sizeId], references: [id])
-  color       Color?   @relation(fields: [colorId], references: [id])
-
-  @@index([productId])
-  @@index([sizeId])
-  @@index([colorId])
+model User {
+  id              String    @id @default(uuid())
+  email           String    @unique
+  name            String?
+  orders          Order[]   @relation("UserToOrder")
+  wishlistProducts Product[] @relation("UserToWishlist")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }

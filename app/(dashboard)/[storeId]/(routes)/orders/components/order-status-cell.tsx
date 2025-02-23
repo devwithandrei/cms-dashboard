@@ -1,70 +1,64 @@
-"use client";
-
 import { useState } from "react";
-import { OrderStatus } from "@/types";
+import { OrderStatus } from "@prisma/client";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import axios from "axios";
+import { toast } from "react-hot-toast";
 
 interface OrderStatusCellProps {
   initialStatus: OrderStatus;
   orderId: string;
-  storeId: string;
 }
+
+const statusColorMap: Record<OrderStatus, string> = {
+  [OrderStatus.PENDING]: "bg-yellow-500/20 text-yellow-700",
+  [OrderStatus.PAID]: "bg-blue-500/20 text-blue-700",
+  [OrderStatus.SHIPPED]: "bg-purple-500/20 text-purple-700",
+  [OrderStatus.DELIVERED]: "bg-green-500/20 text-green-700",
+  [OrderStatus.CANCELLED]: "bg-red-500/20 text-red-700",
+};
 
 export const OrderStatusCell = ({
   initialStatus,
   orderId,
-  storeId,
 }: OrderStatusCellProps) => {
   const [status, setStatus] = useState<OrderStatus>(initialStatus);
   const [isLoading, setIsLoading] = useState(false);
 
-  const statusColors: Record<OrderStatus, string> = {
-    'PENDING': 'text-yellow-600',
-    'PAID': 'text-blue-600',
-    'DELIVERED': 'text-green-600',
-    'CANCELED': 'text-red-600',
-  };
-
-  const handleStatusChange = async (newStatus: OrderStatus) => {
+  const onStatusChange = async (newStatus: OrderStatus) => {
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/${storeId}/orders/${orderId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status: newStatus }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update status');
-      }
-
+      await axios.patch(`/api/orders/${orderId}`, { status: newStatus });
       setStatus(newStatus);
+      toast.success("Order status updated");
     } catch (error) {
-      console.error('Error updating order status:', error);
+      toast.error("Something went wrong");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="flex items-center gap-2">
-      <select
-        value={status}
-        onChange={(e) => handleStatusChange(e.target.value as OrderStatus)}
+    <div className="flex items-center gap-x-2">
+      <Select
         disabled={isLoading}
-        className={`
-          font-medium p-2 rounded-md border
-          ${statusColors[status]}
-          disabled:opacity-50
-          transition-colors
-        `}
+        value={status}
+        onValueChange={(value: OrderStatus) => onStatusChange(value)}
       >
-        <option value="PENDING">Pending</option>
-        <option value="PAID">Paid</option>
-        <option value="DELIVERED">Delivered</option>
-        <option value="CANCELED">Canceled</option>
-      </select>
+        <SelectTrigger className={`w-[180px] ${statusColorMap[status]}`}>
+          <SelectValue defaultValue={status} />
+        </SelectTrigger>
+        <SelectContent>
+          {Object.values(OrderStatus).map((status) => (
+            <SelectItem
+              key={status}
+              value={status}
+              className={statusColorMap[status]}
+            >
+              {status}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 };

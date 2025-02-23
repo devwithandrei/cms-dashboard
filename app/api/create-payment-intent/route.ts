@@ -29,7 +29,7 @@ export async function POST(
   { params }: { params: { storeId: string } }
 ) {
   try {
-    const { productIds, sizes, colors, quantities, customerDetails } = await req.json();
+    const { productIds, sizes, colors, quantities, customerDetails, userId } = await req.json();
 
     if (!productIds || productIds.length === 0) {
       return new NextResponse("Product ids are required", { status: 400 });
@@ -73,6 +73,7 @@ export async function POST(
         city: customerDetails.city || '',
         country: customerDetails.country || '',
         postalCode: customerDetails.postalCode || '',
+        userId: userId,
         orderItems: {
           create: productIds.map((productId: string, index: number) => {
             const product = products.find((p: ProductWithPrice) => p.id === productId);

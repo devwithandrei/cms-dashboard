@@ -23,7 +23,7 @@ const BrandsPage = async ({
     id: item.id,
     name: item.name,
     value: item.value,
-    createdAt: format(item.createdAt, 'MMMM do, yyyy'),
+    createdAt: format(item.createdAt, "MMMM do, yyyy"),
   }));
 
   return (

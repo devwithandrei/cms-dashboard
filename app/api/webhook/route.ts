@@ -1,13 +1,21 @@
 import Stripe from "stripe";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
-import { OrderStatus } from "@/types";
-
+import { OrderStatus } from "@prisma/client";
 import prismadb from "@/lib/prismadb";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2022-11-15",
 });
+
+interface Variation {
+  sizeId?: string;
+  colorId?: string;
+}
+
+interface VariationsMap {
+  [key: string]: Variation;
+}
 
 export async function POST(req: Request) {
   const body = await req.text();
@@ -25,60 +33,147 @@ export async function POST(req: Request) {
     return new NextResponse(`Webhook Error: ${error.message}`, { status: 400 });
   }
 
-  if (event.type === "payment_intent.succeeded") {
+  if (event.type === "payment_intent.payment_failed") {
     const paymentIntent = event.data.object as Stripe.PaymentIntent;
-    const customerDetails = paymentIntent.metadata?.customerDetails 
-      ? JSON.parse(paymentIntent.metadata.customerDetails)
-      : null;
-    const items = paymentIntent.metadata?.items 
-      ? JSON.parse(paymentIntent.metadata.items)
-      : [];
+    const orderId = paymentIntent.metadata?.orderId;
 
-    try {
-      // Create order
-      const order = await prismadb.order.create({
-        data: {
-          storeId: process.env.STORE_ID!, // Make sure to set this in your environment
-          status: 'PAID' as OrderStatus,
-          phone: customerDetails?.phone || '',
-          address: customerDetails?.address || '',
-          customerEmail: customerDetails?.email || '',
-          customerName: customerDetails?.name || '',
-          city: customerDetails?.city || '',
-          country: customerDetails?.country || '',
-          postalCode: customerDetails?.postalCode || '',
-          orderItems: {
-            create: items.map((item: any) => ({
-              productId: item.id,
-              quantity: item.quantity,
-              price: item.price,
-              sizeId: item.size || null,
-              colorId: item.color || null,
-            }))
-          }
-        },
+    if (orderId) {
+      await prismadb.order.update({
+        where: { id: orderId },
+        data: { status: OrderStatus.CANCELLED }
+      });
+    }
+  } else if (event.type === "charge.refunded") {
+    const charge = event.data.object as Stripe.Charge;
+    const paymentIntentId = charge.payment_intent as string;
+
+    if (paymentIntentId) {
+      const order = await prismadb.order.findFirst({
+        where: { paymentIntentId }
       });
 
-      // Update product stock
-      for (const item of items) {
-        const product = await prismadb.product.findUnique({
-          where: { id: item.id }
+      if (order) {
+        await prismadb.order.update({
+          where: { id: order.id },
+          data: { status: OrderStatus.CANCELLED }
+        });
+      }
+    }
+  } else if (event.type === "payment_intent.succeeded") {
+    const paymentIntent = event.data.object as Stripe.PaymentIntent;
+    const orderId = paymentIntent.metadata?.orderId;
+    const userId = paymentIntent.metadata?.userId;
+
+    if (!orderId || !userId) {
+      return new NextResponse("Missing order information", { status: 400 });
+    }
+
+    try {
+      // Update existing order and get items
+      const order = await prismadb.order.findUnique({
+        where: { id: orderId },
+        include: { orderItems: true }
+      });
+
+      if (!order) {
+        return new NextResponse("Order not found", { status: 404 });
+      }
+
+      // Get variations from metadata
+      let variations: VariationsMap = {};
+      try {
+        if (paymentIntent.metadata?.variations) {
+          variations = JSON.parse(paymentIntent.metadata.variations);
+        }
+      } catch (error) {
+        console.error('Error parsing variations:', error);
+        // Continue with empty variations object
+      }
+
+      // Use transaction to ensure data consistency
+      await prismadb.$transaction(async (tx) => {
+        // Update order status
+        await tx.order.update({
+          where: { id: orderId },
+          data: { 
+            status: OrderStatus.PAID,
+            isPaid: true,
+            paymentIntentId: paymentIntent.id
+          }
         });
 
-        if (product && typeof product.stock === 'number') {
-          await prismadb.product.update({
-            where: { id: item.id },
+        // Process each order item
+        for (const item of order.orderItems) {
+          const product = await tx.product.findUnique({
+            where: { id: item.productId },
+            include: {
+              productSizes: {
+                include: { size: true }
+              },
+              productColors: {
+                include: { color: true }
+              }
+            }
+          });
+
+          if (!product) continue;
+
+          const variation = variations[item.productId];
+
+          // Update size variation stock if selected
+          if (variation?.sizeId) {
+            const productSize = product.productSizes.find(ps => ps.sizeId === variation.sizeId);
+            if (productSize) {
+              await tx.productSize.update({
+                where: { id: productSize.id },
+                data: { stock: Math.max(0, productSize.stock - item.quantity) }
+              });
+            }
+          }
+
+          // Update color variation stock if selected
+          if (variation?.colorId) {
+            const productColor = product.productColors.find(pc => pc.colorId === variation.colorId);
+            if (productColor) {
+              await tx.productColor.update({
+                where: { id: productColor.id },
+                data: { stock: Math.max(0, productColor.stock - item.quantity) }
+              });
+            }
+          }
+
+          // If no variations or variations not found, update base product stock
+          if ((!variation?.sizeId && !variation?.colorId) || 
+              (variation?.sizeId && !product.productSizes.find(ps => ps.sizeId === variation.sizeId)) ||
+              (variation?.colorId && !product.productColors.find(pc => pc.colorId === variation.colorId))) {
+            if (product.stock !== null && product.stock !== undefined) {
+              await tx.product.update({
+                where: { id: item.productId },
+                data: { stock: Math.max(0, product.stock - item.quantity) }
+              });
+            }
+          }
+
+          // Create stock history entry with variation details
+          await tx.stockHistory.create({
             data: {
-              stock: Math.max(0, product.stock - (item.quantity || 1))
+              productId: item.productId,
+              quantity: -item.quantity,
+              type: 'OUT',
+              reason: `Order ${order.id}${
+                variation?.sizeId ? ` (Size: ${product.productSizes.find(ps => ps.sizeId === variation.sizeId)?.size.name})` : ''
+              }${
+                variation?.colorId ? ` (Color: ${product.productColors.find(pc => pc.colorId === variation.colorId)?.color.name})` : ''
+              }`
             }
           });
         }
-      }
+      });
 
       return new NextResponse(JSON.stringify({ orderId: order.id }), { status: 200 });
     } catch (error) {
-      console.error('Error processing order:', error);
-      return new NextResponse('Error processing order', { status: 500 });
+      console.error('Error processing payment:', error);
+      return new NextResponse('Error processing payment', { status: 500 });
     }
   }
 

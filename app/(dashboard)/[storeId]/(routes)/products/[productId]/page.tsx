@@ -117,12 +117,12 @@ const ProductPage = async ({
             <StockHistory
               initialHistory={stockHistories.map(history => ({
                 id: history.id,
-                oldStock: history.oldStock,
-                newStock: history.newStock,
-                changeType: history.changeType,
+                oldStock: history.oldStock || 0,
+                newStock: history.newStock || 0,
+                changeType: history.type,
                 reason: history.reason,
                 createdAt: history.createdAt,
-                createdBy: history.createdBy
+                createdBy: ""
               }))}
             />
           </>

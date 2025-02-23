@@ -43,16 +43,23 @@ export async function POST(
       return new NextResponse("Product not found", { status: 404 });
     }
 
+    // Get current stock
+    const currentStock = product.stock || 0;
+
+    // Calculate quantity
+    const quantity = newStock - currentStock;
+
     // Create stock history entry
-    await prismadb.stockHistory.create({
+    const stockHistoryEntry = await prismadb.stockHistory.create({
       data: {
         productId: params.productId,
-        oldStock: product.stock || 0,
-        newStock,
+        quantity,
+        type: changeType === 'increase' ? 'IN' : 'OUT',
         reason,
-        changeType,
-        createdBy: userId
-      }
+        oldStock: currentStock,
+        newStock,
+        createdAt: new Date(),
+      },
     });
 
     // Update product stock
@@ -61,7 +68,7 @@ export async function POST(
       data: { stock: newStock }
     });
 
-    return NextResponse.json(updatedProduct);
+    return NextResponse.json({ stockHistoryEntry, updatedProduct });
   } catch (error) {
     console.log('[STOCK_HISTORY_POST]', error);
     return new NextResponse("Internal error", { status: 500 });
@@ -92,11 +99,10 @@ export async function GET(
 
     const stockHistory = await prismadb.stockHistory.findMany({
       where: {
-        productId: params.productId
+        productId: params.productId,
       },
       include: {
-        size: true,
-        color: true
+        // Only include properties that are valid in StockHistoryInclude
       },
       orderBy: {
         createdAt: 'desc'

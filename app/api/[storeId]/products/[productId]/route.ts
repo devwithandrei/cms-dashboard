@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs";
 import prismadb from "@/lib/prismadb";
+import { sendOutlyWebhook } from "@/lib/webhook-utils";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -202,6 +203,10 @@ export async function PATCH(
     });
 
     console.log('Updated product:', product);
+
+    // Send webhook to Outly
+    await sendOutlyWebhook('product.updated', product);
+
     return NextResponse.json(product, { headers: corsHeaders });
   } catch (error) {
     console.log('[PRODUCT_PATCH]', error);
@@ -240,6 +245,9 @@ export async function DELETE(
         id: params.productId
       }
     });
+
+    // Send webhook to Outly
+    await sendOutlyWebhook('product.deleted', product);
 
     return NextResponse.json(product, { headers: corsHeaders });
   } catch (error) {

@@ -1,31 +1,25 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { OrderStatus } from "@/types";
 import { OrderStatusCell } from "./order-status-cell";
+
+import { OrderStatus } from "@prisma/client";
 
 export type OrderColumn = {
   id: string;
   phone: string;
   address: string;
-  products: string;
-  totalPrice: string;
-  status: OrderStatus;
-  createdAt: string;
-  customerEmail: string;
-  customerName: string;
   city: string;
   country: string;
   postalCode: string;
-  storeId: string;
-  orderItems?: {
-    id: string;
-    productId: string;
-    quantity: number;
-    price: string;
-    size?: { id: string; name: string } | null;
-    color?: { id: string; name: string } | null;
-  }[];
+  email: string;
+  isPaid: boolean;
+  totalPrice: string;
+  products: string;
+  status: OrderStatus;
+  createdAt: string;
+  customerName?: string;
+  customerEmail?: string;
 };
 
 export const columns: ColumnDef<OrderColumn>[] = [
@@ -42,16 +36,12 @@ export const columns: ColumnDef<OrderColumn>[] = [
     header: "Address",
   },
   {
-    accessorKey: "city",
-    header: "City",
+    accessorKey: "totalPrice",
+    header: "Total price",
   },
   {
-    accessorKey: "country",
-    header: "Country",
-  },
-  {
-    accessorKey: "postalCode",
-    header: "Postal Code",
+    accessorKey: "isPaid",
+    header: "Paid",
   },
   {
     accessorKey: "status",
@@ -60,24 +50,11 @@ export const columns: ColumnDef<OrderColumn>[] = [
       <OrderStatusCell
         initialStatus={row.original.status}
         orderId={row.original.id}
-        storeId={row.original.storeId}
       />
-    )
-  },
-  {
-    accessorKey: "totalPrice",
-    header: "Total Price",
+    ),
   },
   {
     accessorKey: "createdAt",
-    header: "Created At",
-  },
-  {
-    accessorKey: "customerEmail",
-    header: "Email Address",
-  },
-  {
-    accessorKey: "customerName",
-    header: "Customer Name",
+    header: "Date",
   },
 ];

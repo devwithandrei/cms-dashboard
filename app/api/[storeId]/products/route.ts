@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prismadb from '@/lib/prismadb';
 import { auth } from '@clerk/nextjs';
+import { sendOutlyWebhook } from "@/lib/webhook-utils";
 
 interface ProductVariation {
   sizeId?: string;
@@ -255,6 +256,10 @@ export async function POST(
     });
 
     console.log('Created product:', product);
+
+    // Send webhook to Outly
+    await sendOutlyWebhook('product.created', product);
+
     return NextResponse.json(product, { headers: corsHeaders });
   } catch (error) {
     console.log('[PRODUCTS_POST]', error);

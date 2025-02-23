@@ -6,7 +6,7 @@ import { toast } from "react-hot-toast";
 import { OrderColumn } from "./components/columns";
 import { format } from "date-fns";
 import { useState } from "react";
-import { OrderStatus } from "@/types";
+import { OrderStatus } from "@prisma/client";
 
 interface OrdersClientProps {
   orders: OrderColumn[];
@@ -57,10 +57,7 @@ const OrdersClient: React.FC<OrdersClientProps> = ({ orders, storeId }) => {
   };
 
   const formatOrderItems = (order: OrderColumn) => {
-    if (!order.orderItems) return "No items";
-    return order.orderItems.map(item => 
-      `${item.quantity}x Product(${item.productId})${item.size ? ` - Size: ${item.size.name}` : ''}${item.color ? ` - Color: ${item.color.name}` : ''}`
-    ).join(", ");
+    return order.products || "No items";
   };
 
   return (
@@ -72,18 +69,18 @@ const OrdersClient: React.FC<OrdersClientProps> = ({ orders, storeId }) => {
             <div className="flex justify-between items-start">
               <div>
                 <h3 className="text-lg font-bold text-black dark:text-white">Order ID: {order.id}</h3>
-                <p className="text-black dark:text-white"><strong>Customer:</strong> {order.customerName}</p>
-                <p className="text-black dark:text-white"><strong>Email:</strong> {order.customerEmail}</p>
+                {order.customerName && <p className="text-black dark:text-white"><strong>Customer:</strong> {order.customerName}</p>}
+                {order.email && <p className="text-black dark:text-white"><strong>Email:</strong> {order.email}</p>}
                 <p className="text-black dark:text-white"><strong>Phone:</strong> {order.phone}</p>
-                <p className="text-black dark:text-white"><strong>Address:</strong> {order.address}, {order.city}, {order.country}, {order.postalCode}</p>
+                <p className="text-black dark:text-white"><strong>Address:</strong> {order.address} {order.city && `, ${order.city}`} {order.country && `, ${order.country}`} {order.postalCode && `, ${order.postalCode}`}</p>
                 <p className="text-black dark:text-white"><strong>Products:</strong> {formatOrderItems(order)}</p>
                 <p className="text-black dark:text-white"><strong>Total Price:</strong> ${order.totalPrice}</p>
                 <p className="text-black dark:text-white"><strong>Created At:</strong> {format(new Date(order.createdAt), 'MMMM dd, yyyy hh:mm a')}</p>
                 <p className="text-black dark:text-white">
-                  <strong>Status:</strong> 
+                  <strong>Status:</strong>
                   <span className={`ml-2 font-semibold ${
-                    order.status === OrderStatus.DELIVERED ? 'text-green-600' : 
-                    order.status === OrderStatus.CANCELED ? 'text-red-600' : 
+                    order.status === "DELIVERED" ? 'text-green-600' :
+                    order.status === "CANCELLED" ? 'text-red-600' :
                     'text-blue-600'
                   }`}>
                     {order.status}
@@ -91,14 +88,14 @@ const OrdersClient: React.FC<OrdersClientProps> = ({ orders, storeId }) => {
                 </p>
               </div>
               <div className="flex flex-col space-y-2">
-                <select 
+                <select
                   className="p-2 border rounded-md bg-white dark:bg-gray-700 text-black dark:text-white"
                   value={order.status}
                   onChange={(e) => updateOrderStatus(order.id, e.target.value as OrderStatus)}
                 >
-                  <option value={OrderStatus.PAID}>Paid</option>
-                  <option value={OrderStatus.DELIVERED}>Delivered</option>
-                  <option value={OrderStatus.CANCELED}>Canceled</option>
+                  <option value="PAID">Paid</option>
+                  <option value="DELIVERED">Delivered</option>
+                  <option value="CANCELLED">Canceled</option>
                 </select>
                 <button
                   onClick={() => deleteOrder(order.id)}

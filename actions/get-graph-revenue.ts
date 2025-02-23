@@ -1,5 +1,5 @@
 import prismadb from "@/lib/prismadb";
-import { OrderStatus } from "@/types";
+import { OrderStatus } from "@prisma/client";
 
 interface GraphData {
   name: string;
@@ -31,7 +31,7 @@ export const getGraphRevenue = async (storeId: string): Promise<GraphData[]> => 
     let revenueForOrder = 0;
 
     for (const item of order.orderItems) {
-      revenueForOrder += Number(item.price) * item.quantity;
+      revenueForOrder += Number(item.product.price) * item.quantity;
     }
 
     // Adding the revenue for this order to the respective month
