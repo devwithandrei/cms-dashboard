@@ -11,10 +11,11 @@ export type UserColumn = {
   lastName: string | null;
   imageUrl: string;
   createdAt: string;
-  status: "active" | "inactive";
+  status: "active" | "inactive" | "pending";
   ordersCount: number;
   totalSpent: number;
-  lastOrderDate: string | null;
+  lastOrderDate: Date | null;
+  wishlistCount: number;
 };
 
 export const columns: ColumnDef<UserColumn>[] = [
@@ -34,7 +35,15 @@ export const columns: ColumnDef<UserColumn>[] = [
     accessorKey: "status",
     header: "Status",
     cell: ({ row }) => (
-      <Badge variant={row.original.status === "active" ? "default" : "secondary"}>
+      <Badge 
+        variant={
+          row.original.status === "active" 
+            ? "default" 
+            : row.original.status === "pending" 
+              ? "outline"
+              : "secondary"
+        }
+      >
         {row.original.status}
       </Badge>
     ),
@@ -54,6 +63,10 @@ export const columns: ColumnDef<UserColumn>[] = [
       }).format(amount);
       return formatted;
     }
+  },
+  {
+    accessorKey: "wishlistCount",
+    header: "Wishlist Items",
   },
   {
     id: "actions",

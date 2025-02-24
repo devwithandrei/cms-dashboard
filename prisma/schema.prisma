@@ -116,6 +116,7 @@ model Order {
 
   @@index([storeId])
   @@index([userId])
+  @@index([paymentIntentId])
 }
 
 model OrderItem {
@@ -168,7 +169,7 @@ model Color {
 model Brand {
   id        String    @id @default(uuid())
   name      String
-  value     String  @default("")
+  value     String    @default("")
   storeId   String
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -233,16 +234,16 @@ model ProductColor {
 }
 
 model StockHistory {
-  id        String   @id @default(uuid())
-  productId String
-  quantity  Int
-  type      String   // "IN" or "OUT"
-  reason    String?  // e.g., "Purchase", "Sale", "Adjustment"
-  oldStock  Int?
-  newStock  Int?
-  changeType String?
-  createdAt DateTime @default(now())
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id          String   @id @default(uuid())
+  productId   String
+  quantity    Int
+  type        String   // "IN" or "OUT"
+  reason      String?  // e.g., "Purchase", "Sale", "Adjustment"
+  oldStock    Int?
+  newStock    Int?
+  changeType  String?
+  createdAt   DateTime @default(now())
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId])
 }

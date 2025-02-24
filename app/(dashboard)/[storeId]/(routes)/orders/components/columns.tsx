@@ -14,7 +14,7 @@ export type OrderColumn = {
   postalCode: string;
   email: string;
   isPaid: boolean;
-  totalPrice: string;
+  amount: string;
   products: string;
   status: OrderStatus;
   createdAt: string;
@@ -36,8 +36,8 @@ export const columns: ColumnDef<OrderColumn>[] = [
     header: "Address",
   },
   {
-    accessorKey: "totalPrice",
-    header: "Total price",
+    accessorKey: "amount",
+    header: "Total Amount",
   },
   {
     accessorKey: "isPaid",

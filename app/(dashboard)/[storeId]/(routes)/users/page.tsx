@@ -9,21 +9,45 @@ const UsersPage = async ({
   params: { storeId: string }
 }) => {
   try {
-    const users = await clerkClient.users.getUserList();
+    // Get all Clerk users
+    const clerkUsers = await clerkClient.users.getUserList();
+    
+    // Get all database users with their orders and wishlist
+    const dbUsers = await prismadb.user.findMany({
+      include: {
+        orders: {
+          select: {
+            amount: true,
+            createdAt: true,
+          }
+        },
+        wishlistProducts: true,
+      }
+    });
 
-    const formattedUsers: UserColumn[] = users.map((user) => {
+    // Merge Clerk and database data
+    const formattedUsers: UserColumn[] = clerkUsers.map((clerkUser) => {
+      const dbUser = dbUsers.find(u => u.id === clerkUser.id);
+      const orders = dbUser?.orders || [];
+      const totalSpent = orders.reduce((sum, order) => sum + Number(order.amount), 0);
+      const lastOrder = orders.length > 0 
+        ? orders.reduce((latest, order) => 
+            latest.createdAt > order.createdAt ? latest : order
+          )
+        : null;
 
       return {
-        id: user.id,
-        email: user.emailAddresses[0]?.emailAddress || '',
-        firstName: user.firstName || '',
-        lastName: user.lastName || '',
-        imageUrl: user.imageUrl,
-        createdAt: user.createdAt ? new Date(user.createdAt).toISOString() : '',
-        status: "inactive",
-        ordersCount: 0, // Placeholder
-        totalSpent: 0,   // Placeholder
-        lastOrderDate: null // Placeholder
+        id: clerkUser.id,
+        email: clerkUser.emailAddresses[0]?.emailAddress || '',
+        firstName: clerkUser.firstName || '',
+        lastName: clerkUser.lastName || '',
+        imageUrl: clerkUser.imageUrl,
+        createdAt: clerkUser.createdAt ? new Date(clerkUser.createdAt).toISOString() : '',
+        status: dbUser ? "active" : "pending",
+        ordersCount: orders.length,
+        totalSpent: totalSpent,
+        lastOrderDate: lastOrder?.createdAt || null,
+        wishlistCount: dbUser?.wishlistProducts.length || 0
       };
     });
 
