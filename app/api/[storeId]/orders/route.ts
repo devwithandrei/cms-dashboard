@@ -33,6 +33,9 @@ export async function GET(
       postalCode: item.postalCode || '',
       email: item.customerEmail || '',
       customerName: item.customerName || '',
+      userId: item.userId,
+      userEmail: item.customerEmail,
+      userName: item.customerName,
       status: item.status,
       products: item.orderItems
         .map((orderItem: any) => orderItem.product.name)

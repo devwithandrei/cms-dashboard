@@ -85,8 +85,9 @@ const OrdersClient: React.FC<OrdersClientProps> = ({ orders, storeId }) => {
             <div className="flex justify-between items-start">
               <div>
                 <h3 className="text-lg font-bold text-black dark:text-white">Order ID: {order.id}</h3>
-                {order.customerName && <p className="text-black dark:text-white"><strong>Customer:</strong> {order.customerName}</p>}
-                {order.email && <p className="text-black dark:text-white"><strong>Email:</strong> {order.email}</p>}
+                <p className="text-black dark:text-white"><strong>User ID:</strong> {order.userId}</p>
+                <p className="text-black dark:text-white"><strong>Name:</strong> {order.userName}</p>
+                <p className="text-black dark:text-white"><strong>Email:</strong> {order.userEmail}</p>
                 <p className="text-black dark:text-white"><strong>Phone:</strong> {order.phone}</p>
                 <p className="text-black dark:text-white"><strong>Address:</strong> {order.address} {order.city && `, ${order.city}`} {order.country && `, ${order.country}`} {order.postalCode && `, ${order.postalCode}`}</p>
                 <p className="text-black dark:text-white"><strong>Products:</strong> {formatOrderItems(order)}</p>

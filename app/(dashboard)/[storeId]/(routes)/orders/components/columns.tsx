@@ -20,9 +20,22 @@ export type OrderColumn = {
   createdAt: string;
   customerName?: string;
   customerEmail?: string;
+  userId: string;
+  userEmail: string;
+  userName: string;
 };
 
 export const columns: ColumnDef<OrderColumn>[] = [
+  {
+    accessorKey: "userName",
+    header: "Name",
+    cell: ({ row }) => row.original.userName
+  },
+  {
+    accessorKey: "userEmail",
+    header: "Email",
+    cell: ({ row }) => row.original.userEmail
+  },
   {
     accessorKey: "products",
     header: "Products",
