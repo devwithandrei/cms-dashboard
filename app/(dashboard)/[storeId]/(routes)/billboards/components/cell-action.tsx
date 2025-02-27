@@ -17,6 +17,7 @@ import {
 import { AlertModal } from "@/components/modals/alert-modal";
 
 import { BillboardColumn } from "./columns";
+import { cn } from "@/lib/utils";
 
 interface CellActionProps {
   data: BillboardColumn;
@@ -31,14 +32,9 @@ export const CellAction: React.FC<CellActionProps> = ({
   const [loading, setLoading] = useState(false);
 
   const onConfirm = async () => {
-    if (!params?.storeId) {
-      toast.error("Missing storeId.");
-      return;
-    }
-    const { storeId } = params;
     try {
       setLoading(true);
-      await axios.delete(`/api/${storeId}/billboards/${data.id}`);
+      await axios.delete(`/api/${params.storeId}/billboards/${data.id}`);
       toast.success('Billboard deleted.');
       router.refresh();
     } catch (error) {
@@ -69,27 +65,32 @@ export const CellAction: React.FC<CellActionProps> = ({
             <MoreHorizontal className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+        <DropdownMenuContent align="end" className="dark:bg-gray-800 dark:border-gray-700">
+          <DropdownMenuLabel className="dark:text-white">Actions</DropdownMenuLabel>
           <DropdownMenuItem
             onClick={() => onCopy(data.id)}
+            className={cn(
+              "cursor-pointer",
+              "dark:text-gray-300 dark:hover:text-white dark:focus:text-white"
+            )}
           >
             <Copy className="mr-2 h-4 w-4" /> Copy Id
           </DropdownMenuItem>
           <DropdownMenuItem
-            onClick={() => {
-              if (!params?.storeId) {
-                toast.error("Missing storeId.");
-                return;
-              }
-              const { storeId } = params;
-              router.push(`/${storeId}/billboards/${data.id}`);
-            }}
+            onClick={() => router.push(`/${params.storeId}/billboards/${data.id}`)}
+            className={cn(
+              "cursor-pointer",
+              "dark:text-gray-300 dark:hover:text-white dark:focus:text-white"
+            )}
           >
             <Edit className="mr-2 h-4 w-4" /> Update
           </DropdownMenuItem>
           <DropdownMenuItem
             onClick={() => setOpen(true)}
+            className={cn(
+              "cursor-pointer",
+              "dark:text-red-400 dark:hover:text-red-300 dark:focus:text-red-300"
+            )}
           >
             <Trash className="mr-2 h-4 w-4" /> Delete
           </DropdownMenuItem>

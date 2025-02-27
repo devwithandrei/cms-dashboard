@@ -33,17 +33,84 @@ export async function POST(req: Request) {
     return new NextResponse(`Webhook Error: ${error.message}`, { status: 400 });
   }
 
-  if (event.type === "payment_intent.payment_failed") {
+  if (event.type === "payment_intent.created") {
     const paymentIntent = event.data.object as Stripe.PaymentIntent;
-    const orderId = paymentIntent.metadata?.orderId;
-
-    if (orderId) {
-      await prismadb.order.update({
-        where: { id: orderId },
-        data: { status: OrderStatus.CANCELLED }
+    
+    try {
+      // Check if order already exists
+      const existingOrder = await prismadb.order.findFirst({
+        where: { paymentIntentId: paymentIntent.id }
       });
+      if (existingOrder) {
+        return new NextResponse(JSON.stringify({ success: true }), { status: 200 });
+      }
+
+      const { userId, storeId, items, customerInfo, variations } = paymentIntent.metadata;
+      const parsedItems = JSON.parse(items);
+      const parsedCustomerInfo = JSON.parse(customerInfo);
+      const parsedVariations = JSON.parse(variations);
+
+      // Create order in PENDING state
+      const order = await prismadb.order.create({
+        data: {
+          userId,
+          storeId,
+          amount: Math.round(paymentIntent.amount / 100),
+          status: OrderStatus.PENDING,
+          isPaid: false,
+          paymentIntentId: paymentIntent.id,
+          customerName: parsedCustomerInfo.name,
+          customerEmail: parsedCustomerInfo.email,
+          phone: parsedCustomerInfo.phone,
+          address: parsedCustomerInfo.address,
+          city: parsedCustomerInfo.city,
+          country: parsedCustomerInfo.country,
+          postalCode: parsedCustomerInfo.postalCode,
+          orderItems: {
+            create: parsedItems.map((item: any) => ({
+              productId: item.id,
+              quantity: item.quantity,
+              sizeId: parsedVariations[item.id]?.sizeId,
+              colorId: parsedVariations[item.id]?.colorId,
+              price: Math.round(Number(item.price))
+            }))
+          }
+        }
+      });
+
+      return new NextResponse(JSON.stringify({ success: true }), { status: 200 });
+    } catch (error) {
+      console.error("Error creating order:", error);
+      return new NextResponse("Error creating order", { status: 500 });
     }
-  } else if (event.type === "charge.refunded") {
+  }
+
+  if (event.type === "payment_intent.payment_failed" || event.type === "payment_intent.canceled") {
+    const paymentIntent = event.data.object as Stripe.PaymentIntent;
+    
+    try {
+      const order = await prismadb.order.findFirst({
+        where: { paymentIntentId: paymentIntent.id }
+      });
+
+      if (order) {
+        await prismadb.order.update({
+          where: { id: order.id },
+          data: {
+            status: OrderStatus.CANCELLED,
+            isPaid: false
+          }
+        });
+      }
+
+      return new NextResponse(JSON.stringify({ success: true }), { status: 200 });
+    } catch (error) {
+      console.error("Error updating order:", error);
+      return new NextResponse("Error updating order", { status: 500 });
+    }
+  }
+
+  if (event.type === "charge.refunded") {
     const charge = event.data.object as Stripe.Charge;
     const paymentIntentId = charge.payment_intent as string;
 
@@ -55,23 +122,21 @@ export async function POST(req: Request) {
       if (order) {
         await prismadb.order.update({
           where: { id: order.id },
-          data: { status: OrderStatus.CANCELLED }
+          data: {
+            status: OrderStatus.CANCELLED,
+            isPaid: false
+          }
         });
       }
     }
-  } else if (event.type === "payment_intent.succeeded") {
+  }
+
+  if (event.type === "payment_intent.succeeded") {
     const paymentIntent = event.data.object as Stripe.PaymentIntent;
-    const orderId = paymentIntent.metadata?.orderId;
-    const userId = paymentIntent.metadata?.userId;
-
-    if (!orderId || !userId) {
-      return new NextResponse("Missing order information", { status: 400 });
-    }
-
+    
     try {
-      // Update existing order and get items
-      const order = await prismadb.order.findUnique({
-        where: { id: orderId },
+      const order = await prismadb.order.findFirst({
+        where: { paymentIntentId: paymentIntent.id },
         include: { orderItems: true }
       });
 
@@ -94,11 +159,10 @@ export async function POST(req: Request) {
       await prismadb.$transaction(async (tx) => {
         // Update order status
         await tx.order.update({
-          where: { id: orderId },
+          where: { id: order.id },
           data: { 
             status: OrderStatus.PAID,
-            isPaid: true,
-            paymentIntentId: paymentIntent.id
+            isPaid: true
           }
         });
 
@@ -170,7 +234,7 @@ export async function POST(req: Request) {
         }
       });
 
-      return new NextResponse(JSON.stringify({ orderId: order.id }), { status: 200 });
+      return new NextResponse(JSON.stringify({ success: true }), { status: 200 });
     } catch (error) {
       console.error('Error processing payment:', error);
       return new NextResponse('Error processing payment', { status: 500 });

@@ -11,11 +11,29 @@ export async function GET(
     const orders = await prismadb.order.findMany({
       where: {
         storeId: params.storeId,
+        OR: [
+          { status: "PAID" },
+          { status: "SHIPPED" },
+          { status: "DELIVERED" },
+          { AND: [
+            { status: "CANCELLED" },
+            { paymentIntentId: { not: null } }
+          ]}
+        ]
       },
       include: {
         orderItems: {
           include: {
-            product: true,
+            product: {
+              select: {
+                id: true,
+                name: true,
+                price: true,
+                images: true
+              }
+            },
+            size: true,
+            color: true
           },
         },
       },
@@ -40,7 +58,13 @@ export async function GET(
       products: item.orderItems
         .map((orderItem: any) => orderItem.product.name)
         .join(", "),
-      amount: formatCurrency(item.amount),
+      totalPrice: item.amount.toString(),
+      shippingDetails: {
+        address: item.address,
+        city: item.city,
+        country: item.country,
+        postalCode: item.phone
+      },
       isPaid: item.isPaid,
       createdAt: item.createdAt.toISOString(),
     }));
@@ -49,5 +73,42 @@ export async function GET(
   } catch (error) {
     console.error("[ORDERS_GET]", error);
     return new NextResponse("Internal Error", { status: 500 });
+  }
+}
+
+export async function PATCH(
+  req: Request,
+  { params }: { params: { storeId: string } }
+) {
+  try {
+    const { orderId, status, action } = await req.json();
+
+    if (!orderId) {
+      return new NextResponse("Order id is required", { status: 400 });
+    }
+
+    if (action === "remove") {
+      // Delete the order
+      const order = await prismadb.order.delete({
+        where: {
+          id: orderId
+        }
+      });
+      return NextResponse.json(order);
+    } else {
+      // Update order status
+      const order = await prismadb.order.update({
+        where: {
+          id: orderId
+        },
+        data: {
+          status,
+        }
+      });
+      return NextResponse.json(order);
+    }
+  } catch (error) {
+    console.error("[ORDER_PATCH]", error);
+    return new NextResponse("Internal error", { status: 500 });
   }
 }

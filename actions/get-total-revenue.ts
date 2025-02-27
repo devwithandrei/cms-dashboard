@@ -6,7 +6,7 @@ export const getTotalRevenue = async (storeId: string) => {
     where: {
       storeId,
       status: {
-        in: [OrderStatus.PAID, OrderStatus.DELIVERED]
+        in: [OrderStatus.PAID, OrderStatus.SHIPPED, OrderStatus.DELIVERED]
       }
     },
     include: {
@@ -19,7 +19,8 @@ export const getTotalRevenue = async (storeId: string) => {
   });
 
   const totalRevenue = paidOrders.reduce((total: number, order: Order) => {
-    return total + (order.amount?.toNumber() || 0);
+    const orderAmount = order.amount?.toNumber() || 0;
+    return total + orderAmount;
   }, 0);
 
   return totalRevenue;

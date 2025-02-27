@@ -13,8 +13,7 @@ export default authMiddleware({
     "/api/:storeId/colors",
     "/api/:storeId/billboards",
     "/sign-in",
-    "/sign-up",
-    "/api/(.*)"
+    "/sign-up"
   ],
   afterAuth(auth, req) {
     // Handle auth state

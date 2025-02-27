@@ -1,20 +1,19 @@
 "use client";
 
-import Link from "next/link"
+import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
 
-import { cn } from "@/lib/utils"
+interface MainNavProps {
+  className?: string;
+}
 
 export function MainNav({
   className,
   ...props
-}: React.HTMLAttributes<HTMLElement>) {
+}: MainNavProps) {
   const pathname = usePathname();
   const params = useParams();
-
-  if (!params?.storeId) {
-    return null;
-  }
 
   const routes = [
     {
@@ -38,16 +37,6 @@ export function MainNav({
       active: pathname === `/${params.storeId}/sizes`,
     },
     {
-      href: `/${params.storeId}/brands`,
-      label: 'Brands',
-      active: pathname === `/${params.storeId}/Brands`,
-    },
-    {
-      href: `/${params.storeId}/descriptions`,
-      label: 'Descriptions',
-      active: pathname === `/${params.storeId}/descriptions`,
-    },
-    {
       href: `/${params.storeId}/colors`,
       label: 'Colors',
       active: pathname === `/${params.storeId}/colors`,
@@ -67,16 +56,11 @@ export function MainNav({
       label: 'Settings',
       active: pathname === `/${params.storeId}/settings`,
     },
-    {
-      href: `/${params.storeId}/users`,
-      label: 'Users',
-      active: pathname === `/${params.storeId}/users`,
-    },
-  ]
+  ];
 
   return (
     <nav
-      className={cn("flex items-center space-x-4 lg:space-x-6", className)}
+      className={cn("flex items-center", className)}
       {...props}
     >
       {routes.map((route) => (
@@ -84,13 +68,14 @@ export function MainNav({
           key={route.href}
           href={route.href}
           className={cn(
-            'text-sm font-medium transition-colors hover:text-primary',
-            route.active ? 'text-black dark:text-white' : 'text-muted-foreground'
+            "text-sm font-medium transition-colors hover:text-primary",
+            route.active ? "text-black dark:text-white" : "text-muted-foreground",
+            className?.includes("flex-col") ? "w-full px-2 py-2" : "px-4"
           )}
         >
           {route.label}
-      </Link>
+        </Link>
       ))}
     </nav>
-  )
-};
+  );
+}

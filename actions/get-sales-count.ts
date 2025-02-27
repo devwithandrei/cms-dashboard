@@ -6,7 +6,7 @@ export const getSalesCount = async (storeId: string) => {
     where: {
       storeId,
       status: {
-        in: [OrderStatus.PAID, OrderStatus.DELIVERED]
+        in: [OrderStatus.PAID, OrderStatus.SHIPPED, OrderStatus.DELIVERED]
       }
     },
   });

@@ -1,73 +1,164 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { OrderStatusCell } from "./order-status-cell";
-
-import { OrderStatus } from "@prisma/client";
+import { ArrowUpDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { formatCurrency } from "@/lib/currency";
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 export type OrderColumn = {
   id: string;
   phone: string;
   address: string;
-  city: string;
-  country: string;
-  postalCode: string;
-  email: string;
   isPaid: boolean;
-  amount: string;
+  totalPrice: string;
+  amount: number;
   products: string;
-  status: OrderStatus;
   createdAt: string;
-  customerName?: string;
-  customerEmail?: string;
-  userId: string;
-  userEmail: string;
-  userName: string;
+  status: string;
+  customerName: string;
+  customerEmail: string;
+  shippingDetails: {
+    address: string;
+    city: string;
+    country: string;
+    postalCode: string;
+    phone: string;
+  };
+};
+
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case "PENDING":
+      return "bg-yellow-500 dark:bg-yellow-600";
+    case "PAID":
+      return "bg-blue-500 dark:bg-blue-600";
+    case "SHIPPED":
+      return "bg-purple-500 dark:bg-purple-600";
+    case "DELIVERED":
+      return "bg-green-500 dark:bg-green-600";
+    case "CANCELLED":
+      return "bg-red-500 dark:bg-red-600";
+    default:
+      return "bg-gray-500 dark:bg-gray-600";
+  }
 };
 
 export const columns: ColumnDef<OrderColumn>[] = [
   {
-    accessorKey: "userName",
-    header: "Name",
-    cell: ({ row }) => row.original.userName
-  },
-  {
-    accessorKey: "userEmail",
-    header: "Email",
-    cell: ({ row }) => row.original.userEmail
+    accessorKey: "customerName",
+    header: "Customer",
+    cell: ({ row }) => (
+      <div className="flex flex-col">
+        <div className="font-medium dark:text-white">{row.original.customerName}</div>
+        <div className="text-sm text-gray-500 dark:text-gray-400 truncate max-w-[200px]">
+          {row.original.customerEmail}
+        </div>
+      </div>
+    ),
   },
   {
     accessorKey: "products",
     header: "Products",
+    cell: ({ row }) => (
+      <div className="max-w-[200px] truncate dark:text-white" title={row.original.products}>
+        {row.original.products}
+      </div>
+    ),
   },
   {
-    accessorKey: "phone",
-    header: "Phone",
-  },
-  {
-    accessorKey: "address",
-    header: "Address",
-  },
-  {
-    accessorKey: "amount",
-    header: "Total Amount",
-  },
-  {
-    accessorKey: "isPaid",
-    header: "Paid",
+    accessorKey: "totalPrice",
+    header: ({ column }) => {
+      return (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className={cn(
+            "whitespace-nowrap",
+            "dark:text-gray-300 dark:hover:text-white"
+          )}
+        >
+          Total
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      );
+    },
+   cell: ({ row }) => (
+      <div className="font-medium dark:text-white">
+        {formatCurrency(row.original.amount)}
+      </div>
+    ),
   },
   {
     accessorKey: "status",
-    header: "Status",
+    header: ({ column }) => {
+      return (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="dark:text-gray-300 dark:hover:text-white"
+        >
+          Status
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      );
+    },
     cell: ({ row }) => (
-      <OrderStatusCell
-        initialStatus={row.original.status}
-        orderId={row.original.id}
-      />
+      <Badge className={cn(
+        getStatusColor(row.original.status),
+        "text-white"
+      )}>
+        {row.original.status}
+      </Badge>
+    ),
+  },
+  {
+    accessorKey: "shippingDetails",
+    header: "Shipping",
+    cell: ({ row }) => (
+      <div className="text-sm max-w-[200px]">
+        <div className="truncate dark:text-white" title={row.original.shippingDetails.address}>
+          {row.original.shippingDetails.address}
+        </div>
+        <div className="text-gray-500 dark:text-gray-400 truncate" title={`${row.original.shippingDetails.city}, ${row.original.shippingDetails.country}`}>
+          {row.original.shippingDetails.city}, {row.original.shippingDetails.country}
+        </div>
+      </div>
     ),
   },
   {
     accessorKey: "createdAt",
-    header: "Date",
+    header: ({ column }) => {
+      return (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className={cn(
+            "whitespace-nowrap",
+            "dark:text-gray-300 dark:hover:text-white"
+          )}
+        >
+          Date
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      );
+    },
+    cell: ({ row }) => {
+      const createdAt = row.original.createdAt;
+      if (!createdAt) {
+        return <div className="dark:text-white">Invalid Date</div>;
+      }
+      const date = new Date(createdAt);
+      if (isNaN(date.getTime())) {
+        return <div className="dark:text-white">Invalid Date</div>;
+      }
+      return (
+        <div className="dark:text-white">
+          {format(date, "MMM d, yyyy 'at' HH:mm")}
+        </div>
+      );
+    },
   },
 ];
