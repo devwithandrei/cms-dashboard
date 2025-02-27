@@ -19,49 +19,31 @@ interface GraphData {
 }
 
 export const getGraphRevenue = async (storeId: string): Promise<GraphData[]> => {
-  const paidOrders = await prismadb.order.findMany({
-    where: {
-      storeId,
-      isPaid: true,
-    },
-    include: {
-      orderItems: {
-        include: {
-          product: true
-        }
-      }
-    },
-    orderBy: {
-      createdAt: 'asc'
-    }
-  });
+  // Calculate date range for last 12 months
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setMonth(startDate.getMonth() - 11);
+  startDate.setDate(1);
+  startDate.setHours(0, 0, 0, 0);
 
-  const monthlyRevenue: { [key: string]: { total: number; orderCount: number; orders: any[] } } = {};
-
-  // Group orders by month and year
-  for (const order of paidOrders) {
-    const date = new Date(order.createdAt);
-    const monthYear = `${date.getFullYear()}-${date.getMonth()}`;
-
-    const revenueForOrder = order.orderItems.reduce((total, item) => {
-      return total + (item.product.price.toNumber() * item.quantity);
-    }, 0);
-
-    if (!monthlyRevenue[monthYear]) {
-      monthlyRevenue[monthYear] = {
-        total: 0,
-        orderCount: 0,
-        orders: []
-      };
-    }
-
-    monthlyRevenue[monthYear].total += revenueForOrder;
-    monthlyRevenue[monthYear].orderCount += 1;
-    monthlyRevenue[monthYear].orders.push({
-      ...order,
-      total: revenueForOrder
-    });
-  }
+  // Get monthly aggregated data directly from the database
+  const monthlyData = await prismadb.$queryRaw<
+    Array<{ month: number; year: number; total: number; orderCount: number }>
+  >`
+    SELECT 
+      MONTH(createdAt) as month, 
+      YEAR(createdAt) as year, 
+      SUM(amount) as total, 
+      COUNT(*) as orderCount
+    FROM \`Order\`
+    WHERE 
+      storeId = ${storeId} 
+      AND isPaid = true
+      AND createdAt >= ${startDate}
+      AND createdAt <= ${endDate}
+    GROUP BY YEAR(createdAt), MONTH(createdAt)
+    ORDER BY YEAR(createdAt), MONTH(createdAt)
+  `;
 
   // Create array of last 12 months
   const last12Months = Array.from({ length: 12 }, (_, i) => {
@@ -70,43 +52,93 @@ export const getGraphRevenue = async (storeId: string): Promise<GraphData[]> => 
     return date;
   }).reverse();
 
-  const formattedData: GraphData[] = last12Months.map((date) => {
-    const monthYear = `${date.getFullYear()}-${date.getMonth()}`;
-    const monthData = monthlyRevenue[monthYear] || { total: 0, orderCount: 0, orders: [] };
-
-    // Get daily data for this month
-    const dailyData = Array.from({ length: new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate() }, (_, day) => {
-      const currentDate = new Date(date.getFullYear(), date.getMonth(), day + 1);
-      const dayOrders = monthData.orders.filter(order => {
-        const orderDate = new Date(order.createdAt);
-        return orderDate.getDate() === currentDate.getDate();
-      });
-
-      const dayTotal = dayOrders.reduce((sum, order) => sum + order.total, 0);
-      const dayOrderCount = dayOrders.length;
-
-      // Create hourly data
-      const hourlyData = Array.from({ length: 24 }, (_, hour) => {
-        const hourOrders = dayOrders.filter(order => {
-          const orderDate = new Date(order.createdAt);
-          return orderDate.getHours() === hour;
-        });
-
-        return {
-          hour,
-          total: hourOrders.reduce((sum, order) => sum + order.total, 0),
-          orderCount: hourOrders.length
-        };
-      });
-
-      return {
-        date: currentDate,
-        total: dayTotal,
-        orderCount: dayOrderCount,
-        hourlyData
-      };
+  // Create a map for quick lookup of monthly data
+  const monthDataMap = new Map();
+  monthlyData.forEach(data => {
+    const key = `${data.year}-${data.month}`;
+    monthDataMap.set(key, {
+      total: Number(data.total),
+      orderCount: Number(data.orderCount)
     });
+  });
 
+  // Process each month
+  const formattedData: GraphData[] = await Promise.all(last12Months.map(async (date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1; // SQL months are 1-12
+    const key = `${year}-${month}`;
+    
+    // Get data for this month from our map, or use defaults
+    const monthData = monthDataMap.get(key) || { total: 0, orderCount: 0 };
+    
+    // Get daily data for this month
+    const daysInMonth = new Date(year, month, 0).getDate();
+    
+    // Get daily data from database
+    const dailyData = await Promise.all(
+      Array.from({ length: daysInMonth }, async (_, day) => {
+        const dayNumber = day + 1;
+        const startOfDay = new Date(year, month - 1, dayNumber, 0, 0, 0);
+        const endOfDay = new Date(year, month - 1, dayNumber, 23, 59, 59);
+        
+        // Get daily totals
+        const dailyTotals = await prismadb.order.aggregate({
+          where: {
+            storeId,
+            isPaid: true,
+            createdAt: {
+              gte: startOfDay,
+              lte: endOfDay
+            }
+          },
+          _sum: {
+            amount: true
+          },
+          _count: {
+            id: true
+          }
+        });
+        
+        // Get hourly data
+        const hourlyData = await Promise.all(
+          Array.from({ length: 24 }, async (_, hour) => {
+            const startOfHour = new Date(year, month - 1, dayNumber, hour, 0, 0);
+            const endOfHour = new Date(year, month - 1, dayNumber, hour, 59, 59);
+            
+            const hourlyTotals = await prismadb.order.aggregate({
+              where: {
+                storeId,
+                isPaid: true,
+                createdAt: {
+                  gte: startOfHour,
+                  lte: endOfHour
+                }
+              },
+              _sum: {
+                amount: true
+              },
+              _count: {
+                id: true
+              }
+            });
+            
+            return {
+              hour,
+              total: hourlyTotals._sum.amount?.toNumber() || 0,
+              orderCount: hourlyTotals._count.id || 0
+            };
+          })
+        );
+        
+        return {
+          date: startOfDay,
+          total: dailyTotals._sum.amount?.toNumber() || 0,
+          orderCount: dailyTotals._count.id || 0,
+          hourlyData
+        };
+      })
+    );
+    
     return {
       name: date.toLocaleString('default', { month: 'short' }),
       total: monthData.total,
@@ -115,7 +147,7 @@ export const getGraphRevenue = async (storeId: string): Promise<GraphData[]> => 
       dailyData,
       createdAt: date
     };
-  });
+  }));
 
   return formattedData;
 };

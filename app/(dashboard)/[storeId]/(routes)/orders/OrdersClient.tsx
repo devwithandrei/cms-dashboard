@@ -2,30 +2,29 @@
 
 import { useState, useEffect } from "react";
 import { OrderColumn } from "./components/columns";
-import { DataTable } from "@/components/ui/data-table";
-import { columns } from "./components/columns";
-import { Button } from "@/components/ui/button";
-import { Package, Truck, CheckCircle, Trash2 } from "lucide-react";
+import { OrderCard } from "./components/OrderCard";
+import { OrderSearch } from "./components/OrderSearch";
 import { toast } from "react-hot-toast";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertModal } from "@/components/modals/alert-modal";
-import { cn } from "@/lib/utils";
 
 interface OrdersClientProps {
   orders: OrderColumn[];
   storeId: string;
-  isPaidSection: boolean;
+  currentStatus: "PAID" | "SHIPPED" | "DELIVERED" | "CANCELLED";
 }
 
 const OrdersClient: React.FC<OrdersClientProps> = ({
-  orders,
+  orders: initialOrders,
   storeId,
-  isPaidSection
+  currentStatus
 }) => {
+  const [filteredOrders, setFilteredOrders] = useState(initialOrders);
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [localOrders, setLocalOrders] = useState(orders);
+  const [open, setOpen] = useState(false);
+  const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
 
   // Setup SSE for real-time updates
   useEffect(() => {
@@ -33,7 +32,7 @@ const OrdersClient: React.FC<OrdersClientProps> = ({
 
     eventSource.onmessage = (event) => {
       const updatedOrder = JSON.parse(event.data);
-      setLocalOrders(prevOrders => 
+      setFilteredOrders(prevOrders => 
         prevOrders.map(order => 
           order.id === updatedOrder.id ? { ...order, ...updatedOrder } : order
         )
@@ -45,24 +44,21 @@ const OrdersClient: React.FC<OrdersClientProps> = ({
     };
   }, [storeId]);
 
-  // Update local orders when prop changes
+  // Update filtered orders when initial orders change
   useEffect(() => {
-    setLocalOrders(orders);
-  }, [orders]);
-  const [open, setOpen] = useState(false);
-  const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
+    setFilteredOrders(initialOrders);
+  }, [initialOrders]);
 
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     try {
       setLoading(true);
       setSelectedOrder(orderId);
 
-      const response = await axios.patch(`/api/${storeId}/orders/${orderId}`, {
+      await axios.patch(`/api/${storeId}/orders/${orderId}`, {
         status: newStatus
       });
 
-      // Update local state immediately
-      setLocalOrders(prevOrders => 
+      setFilteredOrders(prevOrders => 
         prevOrders.map(order => 
           order.id === orderId ? { ...order, status: newStatus } : order
         )
@@ -83,8 +79,7 @@ const OrdersClient: React.FC<OrdersClientProps> = ({
 
       await axios.delete(`/api/${storeId}/orders/${orderToDelete}`);
 
-      // Update local state immediately
-      setLocalOrders(prevOrders => 
+      setFilteredOrders(prevOrders => 
         prevOrders.filter(order => order.id !== orderToDelete)
       );
 
@@ -98,82 +93,9 @@ const OrdersClient: React.FC<OrdersClientProps> = ({
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "PAID":
-        return <Package className="w-4 h-4" />;
-      case "SHIPPED":
-        return <Truck className="w-4 h-4" />;
-      case "DELIVERED":
-        return <CheckCircle className="w-4 h-4" />;
-      default:
-        return null;
-    }
+  const handleSearch = (searchResults: OrderColumn[]) => {
+    setFilteredOrders(searchResults);
   };
-
-  const ActionCell = ({ row }: { row: any }) => {
-    const isLoading = selectedOrder === row.original.id && loading;
-    const currentStatus = row.original.status;
-
-    const nextStatus = currentStatus === "PAID" ? "SHIPPED" : 
-                      currentStatus === "SHIPPED" ? "DELIVERED" : null;
-
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -10 }}
-        className="flex items-center gap-2"
-      >
-        <div className="flex items-center gap-2">
-          {isPaidSection && nextStatus && (
-            <Button
-              onClick={() => handleStatusChange(row.original.id, nextStatus)}
-              disabled={isLoading}
-              size="sm"
-              className={cn(
-                "flex items-center gap-2",
-                "bg-blue-600 text-white hover:bg-blue-700",
-                "dark:bg-blue-600 dark:text-white dark:hover:bg-blue-700",
-                "transition-colors duration-200"
-              )}
-            >
-              {isLoading ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-              ) : (
-                getStatusIcon(nextStatus)
-              )}
-              Mark as {nextStatus.toLowerCase()}
-            </Button>
-          )}
-        </div>
-        <Button
-          onClick={() => {
-            setOrderToDelete(row.original.id);
-            setOpen(true);
-          }}
-          disabled={isLoading}
-          size="sm"
-          variant="destructive"
-          className={cn(
-            "flex items-center gap-2",
-            "dark:bg-red-600 dark:hover:bg-red-700"
-          )}
-        >
-          <Trash2 className="w-4 h-4" />
-          Delete Order
-        </Button>
-      </motion.div>
-    );
-  };
-
-  const updatedColumns = [
-    ...columns,
-    {
-      id: "actions",
-      cell: ({ row }: { row: any }) => <ActionCell row={row} />,
-    },
-  ];
 
   return (
     <>
@@ -183,21 +105,38 @@ const OrdersClient: React.FC<OrdersClientProps> = ({
         onConfirm={handleDelete}
         loading={loading}
       />
-      <AnimatePresence mode="wait">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          transition={{ duration: 0.3 }}
-          className="dark:bg-gray-900"
-        >
-          <DataTable 
-            columns={updatedColumns} 
-            data={localOrders}
-            searchKey="products"
-          />
-        </motion.div>
-      </AnimatePresence>
+
+      <OrderSearch orders={initialOrders} onSearch={handleSearch} />
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <AnimatePresence mode="popLayout">
+          {filteredOrders.length === 0 ? (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="col-span-full text-center py-10"
+            >
+              <p className="text-gray-500 dark:text-gray-400">No orders found</p>
+            </motion.div>
+          ) : (
+            filteredOrders.map((order) => (
+              <OrderCard
+                key={order.id}
+                order={order}
+                onStatusChange={handleStatusChange}
+                onDelete={(id) => {
+                  setOrderToDelete(id);
+                  setOpen(true);
+                }}
+                loading={loading}
+                selectedOrder={selectedOrder}
+                currentStatus={currentStatus}
+              />
+            ))
+          )}
+        </AnimatePresence>
+      </div>
     </>
   );
 };

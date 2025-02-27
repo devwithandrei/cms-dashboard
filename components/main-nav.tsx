@@ -6,10 +6,12 @@ import { cn } from "@/lib/utils";
 
 interface MainNavProps {
   className?: string;
+  onLinkClick?: () => void;
 }
 
 export function MainNav({
   className,
+  onLinkClick,
   ...props
 }: MainNavProps) {
   const pathname = usePathname();
@@ -52,6 +54,11 @@ export function MainNav({
       active: pathname === `/${params.storeId}/orders`,
     },
     {
+      href: `/${params.storeId}/users`,
+      label: 'Users',
+      active: pathname === `/${params.storeId}/users` || pathname.startsWith(`/${params.storeId}/users/`),
+    },
+    {
       href: `/${params.storeId}/settings`,
       label: 'Settings',
       active: pathname === `/${params.storeId}/settings`,
@@ -72,6 +79,7 @@ export function MainNav({
             route.active ? "text-black dark:text-white" : "text-muted-foreground",
             className?.includes("flex-col") ? "w-full px-2 py-2" : "px-4"
           )}
+          onClick={onLinkClick}
         >
           {route.label}
         </Link>

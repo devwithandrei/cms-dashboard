@@ -249,7 +249,7 @@ model StockHistory {
 }
 
 model User {
-  id              String    @id @default(uuid())
+  id              String    @id // This will store the Clerk user ID
   email           String    @unique
   name            String?
   orders          Order[]   @relation("UserToOrder")

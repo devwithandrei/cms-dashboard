@@ -12,16 +12,23 @@ const UsersPage = async ({
     // Get all Clerk users
     const clerkUsers = await clerkClient.users.getUserList();
     
-    // Get all database users with their orders and wishlist
+    // Get all database users with their orders and wishlist for the current store
     const dbUsers = await prismadb.user.findMany({
       include: {
         orders: {
+          where: {
+            storeId: params.storeId
+          },
           select: {
             amount: true,
             createdAt: true,
           }
         },
-        wishlistProducts: true,
+        wishlistProducts: {
+          where: {
+            storeId: params.storeId
+          }
+        },
       }
     });
 

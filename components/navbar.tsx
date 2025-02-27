@@ -8,6 +8,7 @@ import StoreSwitcher from "@/components/store-switcher";
 import { Store } from "@prisma/client";
 import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
 import { Button } from "@/components/ui/button";
+import { useState } from "react";
 
 interface NavbarProps {
   stores: Store[];
@@ -16,10 +17,12 @@ interface NavbarProps {
 const Navbar: React.FC<NavbarProps> = ({
   stores
 }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
   return (
     <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex h-16 items-center px-4">
-        <Sheet>
+        <Sheet open={isOpen} onOpenChange={setIsOpen}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon" className="md:hidden mr-2">
               <Menu className="h-5 w-5" />
@@ -28,7 +31,10 @@ const Navbar: React.FC<NavbarProps> = ({
           <SheetContent side="left" className="w-[300px] bg-background/95 backdrop-blur-sm p-0">
             <div className="px-4 py-6 space-y-4">
               <StoreSwitcher items={stores} />
-              <MainNav className="flex-col items-start space-y-2" />
+              <MainNav 
+                className="flex-col items-start space-y-2" 
+                onLinkClick={() => setIsOpen(false)}
+              />
             </div>
           </SheetContent>
         </Sheet>
