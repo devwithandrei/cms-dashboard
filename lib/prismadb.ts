@@ -6,7 +6,7 @@ declare global {
 
 const prismaClientSingleton = () => {
   return new PrismaClient({
-    log: ['query', 'error', 'warn'],
+    log: ['error', 'warn'], // Removed 'query' to reduce logging
     datasources: {
       db: {
         url: process.env.DATABASE_URL,

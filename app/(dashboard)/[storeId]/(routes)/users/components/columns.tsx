@@ -20,8 +20,22 @@ export type UserColumn = {
 
 export const columns: ColumnDef<UserColumn>[] = [
   {
+    accessorKey: "id",
+    header: "User ID",
+    cell: ({ row }) => (
+      <div className="max-w-[100px] truncate" title={row.getValue("id")}>
+        {row.getValue("id")}
+      </div>
+    ),
+  },
+  {
     accessorKey: "email",
     header: "Email",
+    cell: ({ row }) => (
+      <div className="max-w-[200px] truncate" title={row.getValue("email")}>
+        {row.getValue("email")}
+      </div>
+    ),
   },
   {
     accessorKey: "firstName",

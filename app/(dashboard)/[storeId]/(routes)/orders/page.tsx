@@ -44,7 +44,7 @@ const OrdersPage = async ({
     }
   });
 
-  // Get paginated orders with optimized includes
+  // Get paginated orders with optimized includes and user information
   const orders = await prismadb.order.findMany({
     where: {
       storeId: params.storeId,
@@ -71,6 +71,13 @@ const OrdersPage = async ({
             }
           }
         }
+      },
+      user: {
+        select: {
+          id: true,
+          email: true,
+          name: true
+        }
       }
     },
     orderBy: {
@@ -87,32 +94,54 @@ const OrdersPage = async ({
     }
   });
 
-  const formattedOrders: OrderColumn[] = orders.map((item) => ({
-    id: item.id,
-    phone: item.phone,
-    address: item.address,
-    products: item.orderItems.map((orderItem) => {
+  const formattedOrders: OrderColumn[] = orders.map((item) => {
+    // Use user information from the database if available
+    const userName = item.user?.name || item.customerName;
+    const userEmail = item.user?.email || item.customerEmail;
+    
+    // Format products string with quantities
+    const productsString = item.orderItems.map((orderItem) => {
       const size = orderItem.size?.name || '';
       const color = orderItem.color?.name || '';
       const variations = [size, color].filter(Boolean).join(', ');
-      return `${orderItem.product.name}${variations ? ` (${variations})` : ''}`;
-    }).join(', '),
-    totalPrice: formatter.format(item.amount.toNumber()),
-    amount: item.amount.toNumber(),
-    isPaid: item.isPaid,
-    createdAt: item.createdAt.toISOString(),
-    status: item.status,
-    customerName: item.customerName,
-    customerEmail: item.customerEmail,
-    shippingDetails: {
-      address: item.address,
-      city: item.city,
-      country: item.country,
-      postalCode: item.postalCode,
+      return `${orderItem.product.name} (Qty: ${orderItem.quantity})${variations ? ` (${variations})` : ''}`;
+    }).join(', ');
+    
+    // Format order items with quantity information
+    const formattedOrderItems = item.orderItems.map((orderItem) => ({
+      id: orderItem.id,
+      productId: orderItem.product.id,
+      productName: orderItem.product.name,
+      quantity: orderItem.quantity,
+      size: orderItem.size?.name,
+      color: orderItem.color?.name,
+    }));
+    
+    return {
+      id: item.id,
       phone: item.phone,
-    },
-  }));
+      address: item.address,
+      products: productsString,
+      orderItems: formattedOrderItems,
+      totalPrice: formatter.format(item.amount.toNumber()),
+      amount: item.amount.toNumber(),
+      isPaid: item.isPaid,
+      createdAt: item.createdAt.toISOString(),
+      status: item.status,
+      customerName: userName,
+      customerEmail: userEmail,
+      userId: item.user?.id,
+      shippingDetails: {
+        address: item.address,
+        city: item.city,
+        country: item.country,
+        postalCode: item.postalCode,
+        phone: item.phone,
+      },
+    };
+  });
 
+  const pendingOrders = formattedOrders.filter(order => order.status === "PENDING");
   const paidOrders = formattedOrders.filter(order => order.status === "PAID");
   const shippedOrders = formattedOrders.filter(order => order.status === "SHIPPED");
   const deliveredOrders = formattedOrders.filter(order => order.status === "DELIVERED");
@@ -182,8 +211,18 @@ const OrdersPage = async ({
 
         <Separator className="dark:bg-gray-700" />
         
-        <Tabs defaultValue="paid" className="space-y-4">
-          <TabsList className="grid w-full max-w-2xl grid-cols-4 bg-gray-100 dark:bg-gray-800">
+        <Tabs defaultValue="pending" className="space-y-4">
+          <TabsList className="grid w-full max-w-3xl grid-cols-5 bg-gray-100 dark:bg-gray-800">
+            <TabsTrigger 
+              value="pending"
+              className={cn(
+                "data-[state=active]:bg-yellow-600 data-[state=active]:text-white",
+                "dark:text-gray-300 dark:data-[state=active]:bg-yellow-600 dark:data-[state=active]:text-white",
+                "transition-all duration-200"
+              )}
+            >
+              Pending ({pendingOrders.length})
+            </TabsTrigger>
             <TabsTrigger 
               value="paid"
               className={cn(
@@ -225,6 +264,13 @@ const OrdersPage = async ({
               Canceled ({canceledOrders.length})
             </TabsTrigger>
           </TabsList>
+          <TabsContent value="pending" className="space-y-4">
+            <OrderClient 
+              orders={pendingOrders}
+              storeId={params.storeId}
+              currentStatus="PENDING"
+            />
+          </TabsContent>
           <TabsContent value="paid" className="space-y-4">
             <OrderClient 
               orders={paidOrders}

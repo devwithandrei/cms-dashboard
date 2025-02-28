@@ -16,10 +16,19 @@ export type OrderColumn = {
   totalPrice: string;
   amount: number;
   products: string;
+  orderItems?: {
+    id: string;
+    productId: string;
+    productName: string;
+    quantity: number;
+    size?: string;
+    color?: string;
+  }[];
   createdAt: string;
   status: string;
   customerName: string;
   customerEmail: string;
+  userId?: string; // Clerk user ID
   shippingDetails: {
     address: string;
     city: string;

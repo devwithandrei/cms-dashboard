@@ -1,7 +1,7 @@
 import { UsersClient } from "./components/client";
 import prismadb from "@/lib/prismadb";
 import { UserColumn } from "./components/columns";
-import { clerkClient } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs";
 
 const UsersPage = async ({
   params
@@ -9,9 +9,18 @@ const UsersPage = async ({
   params: { storeId: string }
 }) => {
   try {
-    // Get all Clerk users
-    const clerkUsers = await clerkClient.users.getUserList();
-    
+    const { userId } = auth();
+
+    if (!userId) {
+      return (
+        <div className="flex-col">
+          <div className="flex-1 space-y-4 p-8 pt-6">
+            <p>Unauthorized</p>
+          </div>
+        </div>
+      );
+    }
+
     // Get all database users with their orders and wishlist for the current store
     const dbUsers = await prismadb.user.findMany({
       include: {
@@ -32,10 +41,9 @@ const UsersPage = async ({
       }
     });
 
-    // Merge Clerk and database data
-    const formattedUsers: UserColumn[] = clerkUsers.map((clerkUser) => {
-      const dbUser = dbUsers.find(u => u.id === clerkUser.id);
-      const orders = dbUser?.orders || [];
+    // Format users for display
+    const formattedUsers: UserColumn[] = dbUsers.map(dbUser => {
+      const orders = dbUser.orders || [];
       const totalSpent = orders.reduce((sum, order) => sum + Number(order.amount), 0);
       const lastOrder = orders.length > 0 
         ? orders.reduce((latest, order) => 
@@ -43,18 +51,23 @@ const UsersPage = async ({
           )
         : null;
 
+      // Split name into first and last name
+      const nameParts = dbUser.name ? dbUser.name.split(' ') : ['', ''];
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+
       return {
-        id: clerkUser.id,
-        email: clerkUser.emailAddresses[0]?.emailAddress || '',
-        firstName: clerkUser.firstName || '',
-        lastName: clerkUser.lastName || '',
-        imageUrl: clerkUser.imageUrl,
-        createdAt: clerkUser.createdAt ? new Date(clerkUser.createdAt).toISOString() : '',
-        status: dbUser ? "active" : "pending",
+        id: dbUser.id,
+        email: dbUser.email || '',
+        firstName: firstName,
+        lastName: lastName,
+        imageUrl: '',
+        createdAt: dbUser.createdAt ? new Date(dbUser.createdAt).toISOString() : '',
+        status: "active",
         ordersCount: orders.length,
         totalSpent: totalSpent,
         lastOrderDate: lastOrder?.createdAt || null,
-        wishlistCount: dbUser?.wishlistProducts.length || 0
+        wishlistCount: dbUser.wishlistProducts.length || 0
       };
     });
 

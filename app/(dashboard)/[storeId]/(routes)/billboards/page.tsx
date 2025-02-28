@@ -29,9 +29,6 @@ const BillboardsPage = async ({
   return (
     <div className="flex-col h-full bg-white dark:bg-gray-900">
       <div className="flex-1 space-y-4 p-8 pt-6">
-        <div className="dark:text-white">
-          <Heading title="Billboards" description="Manage billboards for your store" />
-        </div>
         <Separator className="dark:bg-gray-700" />
         <BillboardClient data={formattedBillboards} />
       </div>

@@ -12,7 +12,7 @@ import { AlertModal } from "@/components/modals/alert-modal";
 interface OrdersClientProps {
   orders: OrderColumn[];
   storeId: string;
-  currentStatus: "PAID" | "SHIPPED" | "DELIVERED" | "CANCELLED";
+  currentStatus: "PENDING" | "PAID" | "SHIPPED" | "DELIVERED" | "CANCELLED";
 }
 
 const OrdersClient: React.FC<OrdersClientProps> = ({
@@ -132,6 +132,7 @@ const OrdersClient: React.FC<OrdersClientProps> = ({
                 loading={loading}
                 selectedOrder={selectedOrder}
                 currentStatus={currentStatus}
+                storeId={storeId}
               />
             ))
           )}

@@ -26,15 +26,18 @@ import { cn } from "@/lib/utils";
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
-  searchKey: string;
+  searchKey: string | string[];
+  searchPlaceholder?: string;
 }
 
 export function DataTable<TData, TValue>({
   columns,
   data,
   searchKey,
+  searchPlaceholder = "Search",
 }: DataTableProps<TData, TValue>) {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [globalFilter, setGlobalFilter] = useState<string>("");
 
   const table = useReactTable({
     data,
@@ -45,23 +48,47 @@ export function DataTable<TData, TValue>({
     getFilteredRowModel: getFilteredRowModel(),
     state: {
       columnFilters,
+      globalFilter,
     },
+    onGlobalFilterChange: setGlobalFilter,
   });
+
+  // Function to handle search across multiple columns
+  const handleSearch = (value: string) => {
+    setGlobalFilter(value);
+    
+    // If searchKey is an array, apply the filter to all specified columns
+    if (Array.isArray(searchKey)) {
+      searchKey.forEach(key => {
+        const column = table.getColumn(key);
+        if (column) {
+          column.setFilterValue(value);
+        }
+      });
+    } else {
+      // If searchKey is a string, apply the filter to that column
+      const column = table.getColumn(searchKey);
+      if (column) {
+        column.setFilterValue(value);
+      }
+    }
+  };
 
   return (
     <div>
-      <div className="flex items-center py-4">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4">
         <Input
-          placeholder="Search"
-          value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
-          onChange={(event) =>
-            table.getColumn(searchKey)?.setFilterValue(event.target.value)
-          }
+          placeholder={searchPlaceholder}
+          value={globalFilter}
+          onChange={(event) => handleSearch(event.target.value)}
           className={cn(
-            "max-w-sm",
+            "w-full sm:max-w-sm",
             "dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder-gray-400"
           )}
         />
+        <div className="text-sm text-gray-500 dark:text-gray-400">
+          {table.getFilteredRowModel().rows.length} of {data.length} results
+        </div>
       </div>
       <div className="rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
         <Table>

@@ -7,6 +7,7 @@ export default authMiddleware({
   publicRoutes: [
     "/api/:storeId/checkout",
     "/api/webhook",
+    "/api/clerk-webhook",
     "/api/:storeId/products",
     "/api/:storeId/categories/:categoryId",
     "/api/:storeId/sizes",
