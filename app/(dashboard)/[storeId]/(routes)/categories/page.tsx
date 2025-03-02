@@ -5,6 +5,10 @@ import prismadb from "@/lib/prismadb";
 import { CategoryColumn } from "./components/columns"
 import { CategoriesClient } from "./components/client";
 
+// Add this to prevent caching
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const CategoriesPage = async ({
   params
 }: {

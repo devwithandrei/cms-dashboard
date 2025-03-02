@@ -56,30 +56,45 @@ export default function StoreSwitcher({
           role="combobox"
           aria-expanded={open}
           aria-label="Select a store"
-          className={cn("w-[200px] justify-between", className)}
+          className={cn(
+            "w-[180px] sm:w-[200px] justify-between",
+            "transition-all duration-200 ease-in-out",
+            "border-primary/20 hover:border-primary/50",
+            "bg-background/50 hover:bg-background/80",
+            "focus:ring-1 focus:ring-primary/30",
+            className
+          )}
         >
-          <StoreIcon className="mr-2 h-4 w-4" />
-          {currentStore?.label}
+          <div className="flex items-center truncate">
+            <StoreIcon className="mr-2 h-4 w-4 text-primary/70" />
+            <span className="truncate text-sm">{currentStore?.label}</span>
+          </div>
           <ChevronsUpDown className="ml-auto h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[200px] p-0">
+      <PopoverContent 
+        className="w-[200px] p-0 shadow-md border-primary/20 bg-background/95 backdrop-blur-sm"
+        align="start"
+      >
         <Command>
           <CommandList>
-            <CommandInput placeholder="Search store..." />
+            <CommandInput placeholder="Search store..." className="text-sm" />
             <CommandEmpty>No store found.</CommandEmpty>
             <CommandGroup heading="Stores">
               {formattedItems.map((store) => (
                 <CommandItem
                   key={store.value}
                   onSelect={() => onStoreSelect(store)}
-                  className="text-sm"
+                  className="text-sm cursor-pointer transition-colors duration-200"
                 >
-                  <StoreIcon className="mr-2 h-4 w-4" />
-                  {store.label}
+                  <div className="flex items-center">
+                    <StoreIcon className="mr-2 h-4 w-4 text-primary/70" />
+                    <span className="truncate">{store.label}</span>
+                  </div>
                   <Check
                     className={cn(
-                      "ml-auto h-4 w-4",
+                      "ml-auto h-4 w-4 text-primary",
+                      "transition-opacity duration-200",
                       currentStore?.value === store.value
                         ? "opacity-100"
                         : "opacity-0"
@@ -89,7 +104,7 @@ export default function StoreSwitcher({
               ))}
             </CommandGroup>
           </CommandList>
-          <CommandSeparator />
+          <CommandSeparator className="bg-primary/10" />
           <CommandList>
             <CommandGroup>
               <CommandItem
@@ -97,9 +112,12 @@ export default function StoreSwitcher({
                   setOpen(false);
                   storeModal.onOpen();
                 }}
+                className="cursor-pointer transition-colors duration-200"
               >
-                <PlusCircle className="mr-2 h-5 w-5" />
-                Create Store
+                <div className="flex items-center w-full text-sm font-medium">
+                  <PlusCircle className="mr-2 h-4 w-4 text-primary" />
+                  Create Store
+                </div>
               </CommandItem>
             </CommandGroup>
           </CommandList>

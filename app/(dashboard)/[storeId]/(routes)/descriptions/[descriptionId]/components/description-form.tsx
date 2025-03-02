@@ -72,9 +72,11 @@ export const DescriptionForm: React.FC<DescriptionFormProps> = ({
         }
         await axios.post(`/api/${params.storeId}/descriptions`, data);
       }
-      router.refresh();
       if (params && params.storeId) {
         router.push(`/${params.storeId}/descriptions`);
+        setTimeout(() => {
+          router.refresh();
+        }, 300);
       } else {
         toast.error('Store ID not found.');
       }
@@ -94,9 +96,11 @@ export const DescriptionForm: React.FC<DescriptionFormProps> = ({
         return;
       }
       await axios.delete(`/api/${params.storeId}/descriptions/${params.descriptionId}`);
-      router.refresh();
       if (params && params.storeId) {
         router.push(`/${params.storeId}/descriptions`);
+        setTimeout(() => {
+          router.refresh();
+        }, 300);
       } else {
         toast.error('Store ID not found.');
       }

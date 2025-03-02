@@ -5,6 +5,10 @@ import prismadb from "@/lib/prismadb";
 import { DescriptionColumn } from "./components/columns"
 import { DescriptionsClient } from "./components/client";
 
+// Add this to prevent caching
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const DescriptionsPage = async ({
   params
 }: {

@@ -43,7 +43,9 @@ export const CellAction: React.FC<CellActionProps> = ({
       }
       await axios.delete(`/api/${params.storeId}/descriptions/${data.id}`);
       toast.success('Description deleted.');
-      router.refresh();
+      setTimeout(() => {
+        router.refresh();
+      }, 300);
     } catch (error: any) {
       toast.error('Make sure you removed all products using this Description first.');
     } finally {

@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import prismadb from "@/lib/prismadb";
 
+// Add this to prevent caching
+export const dynamic = 'force-dynamic';
+
 export async function DELETE(
   req: Request,
   { params }: { params: { orderId: string } }

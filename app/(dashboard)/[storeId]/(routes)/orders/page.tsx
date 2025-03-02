@@ -10,6 +10,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
+// Add this to prevent caching
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const OrdersPage = async ({
   params,
   searchParams

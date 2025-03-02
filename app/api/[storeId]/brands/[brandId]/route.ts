@@ -3,6 +3,9 @@ import { NextResponse } from "next/server";
 import prismadb from "@/lib/prismadb";
 import { auth } from "@clerk/nextjs";
 
+// Add this to prevent caching
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   req: Request,
   { params }: { params: { brandId: string } }

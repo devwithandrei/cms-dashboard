@@ -3,6 +3,10 @@ import prismadb from "@/lib/prismadb";
 import { UserColumn } from "./components/columns";
 import { auth } from "@clerk/nextjs";
 
+// Add this to prevent caching
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const UsersPage = async ({
   params
 }: {

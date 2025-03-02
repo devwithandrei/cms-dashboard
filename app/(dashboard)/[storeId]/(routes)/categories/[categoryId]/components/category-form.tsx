@@ -69,8 +69,8 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({
         } else {
           await axios.post(`/api/${params.storeId}/categories`, data);
         }
-        router.refresh();
         router.push(`/${params.storeId}/categories`);
+        router.refresh();
       } else {
         toast.error("Store ID or Category ID is missing.");
       }
@@ -87,8 +87,8 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({
       setLoading(true);
       if (params?.storeId && params?.categoryId){
         await axios.delete(`/api/${params.storeId}/categories/${params.categoryId}`);
-        router.refresh();
         router.push(`/${params.storeId}/categories`);
+        router.refresh();
         toast.success('Category deleted.');
       } else {
         toast.error("Store ID or Category ID is missing.");

@@ -5,6 +5,10 @@ import prismadb from "@/lib/prismadb";
 import { ColorColumn } from "./components/columns"
 import { ColorClient } from "./components/client";
 
+// Add this to prevent caching
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const ColorsPage = async ({
   params
 }: {

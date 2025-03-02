@@ -4,6 +4,9 @@ import { NextResponse } from "next/server";
 import { OrderStatus } from "@prisma/client";
 import prismadb from "@/lib/prismadb";
 
+// Add this to prevent caching
+export const dynamic = 'force-dynamic';
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2022-11-15",
 });

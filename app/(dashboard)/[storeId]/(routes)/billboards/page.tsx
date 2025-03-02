@@ -6,6 +6,10 @@ import { BillboardColumn } from "./components/columns";
 import { Heading } from "@/components/ui/heading";
 import { Separator } from "@/components/ui/separator";
 
+// Add this to prevent caching
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const BillboardsPage = async ({
   params
 }: {

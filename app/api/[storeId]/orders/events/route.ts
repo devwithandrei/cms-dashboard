@@ -3,7 +3,7 @@ import { headers } from 'next/headers';
 import prismadb from "@/lib/prismadb";
 
 export const dynamic = 'force-dynamic';
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 export async function GET(
   req: NextRequest,

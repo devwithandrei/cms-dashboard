@@ -67,9 +67,9 @@ export const ColorForm: React.FC<ColorFormProps> = ({
         } else {
           await axios.post(`/api/${params.storeId}/colors`, data);
         }
-        router.refresh();
         if (params && params.storeId) {
           router.push(`/${params.storeId}/colors`);
+          router.refresh();
         } else {
           toast.error('Store ID not found.');
         }
@@ -89,9 +89,9 @@ export const ColorForm: React.FC<ColorFormProps> = ({
       setLoading(true);
       if (params && params.storeId && params.colorId) {
         await axios.delete(`/api/${params.storeId}/colors/${params.colorId}`);
-        router.refresh();
         if (params && params.storeId) {
           router.push(`/${params.storeId}/colors`);
+          router.refresh();
         } else {
           toast.error('Store ID not found.');
         }

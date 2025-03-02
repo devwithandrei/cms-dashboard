@@ -11,6 +11,10 @@ import { getGraphRevenue } from "@/actions/get-graph-revenue";
 import { formatter } from "@/lib/utils";
 import prismadb from "@/lib/prismadb";
 
+// Add this to prevent caching
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 interface DashboardPageProps {
   params: {
     storeId: string;

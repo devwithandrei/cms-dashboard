@@ -39,7 +39,9 @@ export const CellAction: React.FC<CellActionProps> = ({
       } else {
         toast.error("Store ID is missing.");
       }
-      router.refresh();
+      setTimeout(() => {
+        router.refresh();
+      }, 300);
     } catch (error) {
       toast.error('Make sure you removed all products using this Brand first.');
     } finally {

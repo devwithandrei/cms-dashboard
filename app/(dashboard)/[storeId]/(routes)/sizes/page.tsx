@@ -5,6 +5,10 @@ import prismadb from "@/lib/prismadb";
 import { SizeColumn } from "./components/columns"
 import { SizesClient } from "./components/client";
 
+// Add this to prevent caching
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const SizesPage = async ({
   params
 }: {

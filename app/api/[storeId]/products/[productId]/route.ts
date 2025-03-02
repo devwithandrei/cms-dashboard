@@ -3,6 +3,9 @@ import { auth } from "@clerk/nextjs";
 import prismadb from "@/lib/prismadb";
 import { sendOutlyWebhook } from "@/lib/webhook-utils";
 
+// Add this to prevent caching
+export const dynamic = 'force-dynamic';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',

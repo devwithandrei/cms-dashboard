@@ -3,6 +3,9 @@ import prismadb from '@/lib/prismadb';
 import { auth } from '@clerk/nextjs';
 import { sendOutlyWebhook } from "@/lib/webhook-utils";
 
+// Add this to prevent caching
+export const dynamic = 'force-dynamic';
+
 interface ProductVariation {
   sizeId?: string;
   colorId?: string;

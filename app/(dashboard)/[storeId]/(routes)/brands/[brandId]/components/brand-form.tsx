@@ -70,8 +70,8 @@ export const BrandForm: React.FC<BrandFormProps> = ({
       } else {
         await axios.post(`/api/${storeId}/brands`, data);
       }
-      router.refresh();
       router.push(`/${params.storeId}/brands`);
+      router.refresh();
       toast.success(toastMessage);
     } catch (error: any) {
       toast.error('Something went wrong.');
@@ -89,8 +89,8 @@ export const BrandForm: React.FC<BrandFormProps> = ({
       }
       const { storeId, brandId } = params;
       await axios.delete(`/api/${storeId}/brands/${brandId}`);
-      router.refresh();
       router.push(`/${storeId}/brands`);
+      router.refresh();
       toast.success('Brand deleted.');
     } catch (error: any) {
       toast.error('Make sure you removed all products using this Brand first.');

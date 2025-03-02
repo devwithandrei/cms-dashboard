@@ -1,150 +1,136 @@
-import prismadb from "@/lib/prismadb";
+import prismadb, { withRetry } from "@/lib/prismadb";
+import { format, subDays, addDays, isSameDay, startOfDay, endOfDay } from "date-fns";
 
 interface GraphData {
   name: string;
   total: number;
   orderCount: number;
   averageOrderValue: number;
-  dailyData: {
-    date: Date;
-    total: number;
-    orderCount: number;
-    hourlyData: {
-      hour: number;
-      total: number;
-      orderCount: number;
-    }[];
-  }[];
-  createdAt: Date;
+  growth: number; // Growth percentage compared to previous period
+  trend: 'up' | 'down' | 'stable'; // Trend indicator
+  date: Date; // Store the actual date for sorting and reference
 }
 
 export const getGraphRevenue = async (storeId: string): Promise<GraphData[]> => {
   try {
-    // Calculate date range for last 12 months
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setMonth(startDate.getMonth() - 11);
-    startDate.setDate(1);
+    // First, get the store creation date
+    const store = await withRetry(() => 
+      prismadb.store.findUnique({
+        where: { id: storeId },
+        select: { createdAt: true }
+      })
+    );
+
+    if (!store) {
+      throw new Error(`Store with ID ${storeId} not found`);
+    }
+
+    // Use the store creation date as the start date to get all historical data
+    const startDate = new Date(store.createdAt);
     startDate.setHours(0, 0, 0, 0);
+    
+    // Use current date as end date
+    const endDate = new Date();
+    endDate.setHours(23, 59, 59, 999);
+    
+    console.log(`Fetching daily revenue data from ${startDate.toISOString()} to ${endDate.toISOString()}`);
 
-    // Get monthly aggregated data directly from the database
-    const monthlyData = await prismadb.$queryRaw<
-      Array<{ month: number; year: number; total: number; orderCount: number }>
-    >`
-      SELECT 
-        MONTH(createdAt) as month, 
-        YEAR(createdAt) as year, 
-        SUM(amount) as total, 
-        COUNT(*) as orderCount
-      FROM \`Order\`
-      WHERE 
-        storeId = ${storeId} 
-        AND isPaid = true
-        AND createdAt >= ${startDate}
-        AND createdAt <= ${endDate}
-      GROUP BY YEAR(createdAt), MONTH(createdAt)
-      ORDER BY YEAR(createdAt), MONTH(createdAt)
-    `;
+    // Get daily aggregated data directly from the database
+    const dailyData = await withRetry(() => 
+      prismadb.$queryRaw<
+        Array<{ date: Date; total: number; orderCount: number }>
+      >`
+        SELECT 
+          DATE_TRUNC('day', "createdAt") as date,
+          SUM(amount) as total, 
+          COUNT(*) as "orderCount"
+        FROM "Order"
+        WHERE 
+          "storeId" = ${storeId} 
+          AND "isPaid" = true
+          AND "createdAt" >= ${startDate}
+          AND "createdAt" <= ${endDate}
+        GROUP BY DATE_TRUNC('day', "createdAt")
+        ORDER BY DATE_TRUNC('day', "createdAt")
+      `
+    );
 
-    // Create array of last 12 months
-    const last12Months = Array.from({ length: 12 }, (_, i) => {
-      const date = new Date();
-      date.setMonth(date.getMonth() - i);
-      return date;
-    }).reverse();
+    console.log(`Found ${dailyData.length} days with revenue data`);
 
-    // Create a map for quick lookup of monthly data
-    const monthDataMap = new Map();
-    monthlyData.forEach(data => {
-      const key = `${data.year}-${data.month}`;
-      monthDataMap.set(key, {
-        total: Number(data.total),
-        orderCount: Number(data.orderCount)
+    // Create array of all days in the range
+    const dayCount = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const allDays = Array.from({ length: dayCount }, (_, i) => {
+      return addDays(new Date(startDate), i);
+    });
+
+    // Create a map for quick lookup of daily data
+    const dayDataMap = new Map();
+    dailyData.forEach(data => {
+      const date = new Date(data.date);
+      const key = format(date, 'yyyy-MM-dd');
+      dayDataMap.set(key, {
+        total: Number(data.total) || 0,
+        orderCount: Number(data.orderCount) || 0
       });
     });
 
-    // Process each month
-    const formattedData: GraphData[] = await Promise.all(last12Months.map(async (date) => {
-      const year = date.getFullYear();
-      const month = date.getMonth() + 1; // SQL months are 1-12
-      const key = `${year}-${month}`;
+    // Process each day with real business metrics
+    const formattedData: GraphData[] = allDays.map((date, index) => {
+      const key = format(date, 'yyyy-MM-dd');
       
-      // Get data for this month from our map, or use defaults
-      const monthData = monthDataMap.get(key) || { total: 0, orderCount: 0 };
+      // Get data for this day from our map, or use zero values
+      let dayData = dayDataMap.get(key);
       
-      // Get daily data for this month
-      const daysInMonth = new Date(year, month, 0).getDate();
-      
-      // Get daily data from database in a single query
-      const dailyDataRaw = await prismadb.$queryRaw<
-        Array<{ day: number; hour: number; total: number; orderCount: number }>
-      >`
-        SELECT 
-          DAY(createdAt) as day,
-          HOUR(createdAt) as hour, 
-          SUM(amount) as total, 
-          COUNT(*) as orderCount
-        FROM \`Order\`
-        WHERE 
-          storeId = ${storeId} 
-          AND isPaid = true
-          AND MONTH(createdAt) = ${month}
-          AND YEAR(createdAt) = ${year}
-        GROUP BY DAY(createdAt), HOUR(createdAt)
-        ORDER BY DAY(createdAt), HOUR(createdAt)
-      `;
-      
-      // Create a map for quick lookup of daily/hourly data
-      const dailyHourlyDataMap = new Map();
-      dailyDataRaw.forEach(data => {
-        const key = `${data.day}-${data.hour}`;
-        dailyHourlyDataMap.set(key, {
-          total: Number(data.total),
-          orderCount: Number(data.orderCount)
-        });
-      });
-      
-      // Process daily data
-      const dailyData = Array.from({ length: daysInMonth }, (_, dayIndex) => {
-        const day = dayIndex + 1;
-        const startOfDay = new Date(year, month - 1, day);
-        
-        // Aggregate hourly data for this day
-        let dayTotal = 0;
-        let dayOrderCount = 0;
-        const hourlyData = Array.from({ length: 24 }, (_, hour) => {
-          const key = `${day}-${hour}`;
-          const hourData = dailyHourlyDataMap.get(key) || { total: 0, orderCount: 0 };
-          
-          dayTotal += hourData.total;
-          dayOrderCount += hourData.orderCount;
-          
-          return {
-            hour,
-            total: hourData.total,
-            orderCount: hourData.orderCount
-          };
-        });
-        
-        return {
-          date: startOfDay,
-          total: dayTotal,
-          orderCount: dayOrderCount,
-          hourlyData
-        };
-      });
-      
-      return {
-        name: date.toLocaleString('default', { month: 'short' }),
-        total: monthData.total,
-        orderCount: monthData.orderCount,
-        averageOrderValue: monthData.orderCount > 0 ? monthData.total / monthData.orderCount : 0,
-        dailyData,
-        createdAt: date
-      };
-    }));
+      if (!dayData) {
+        // Use zero values for days without data
+        dayData = { total: 0, orderCount: 0 };
+      }
 
-    return formattedData;
+      // Calculate average order value (AOV)
+      const averageOrderValue =
+        dayData.orderCount > 0 ? dayData.total / dayData.orderCount : 0;
+
+      // Calculate growth metrics (compared to previous day)
+      let growth = 0;
+      let trend: "up" | "down" | "stable" = "stable";
+
+      if (index > 0) {
+        const prevDate = subDays(date, 1);
+        const prevKey = format(prevDate, "yyyy-MM-dd");
+        const prevDayData = dayDataMap.get(prevKey) || { total: 0 };
+
+        // Calculate day-over-day growth percentage
+        if (prevDayData.total > 0) {
+          growth =
+            ((dayData.total - prevDayData.total) / prevDayData.total) * 100;
+        } else if (dayData.total > 0) {
+          growth = 100; // If previous day was 0 and current is positive, 100% growth
+        }
+
+        // Determine trend
+        if (growth > 5) {
+          trend = "up";
+        } else if (growth < -5) {
+          trend = "down";
+        } else {
+          trend = "stable";
+        }
+      }
+
+      // Format the date as "MMM dd" for display (e.g., "Feb 23")
+      const formattedDate = format(date, "MMM dd");
+
+      return {
+        name: formattedDate,
+        total: dayData.total,
+        orderCount: dayData.orderCount,
+        averageOrderValue,
+        growth: parseFloat(growth.toFixed(2)),
+        trend,
+        date: new Date(date), // Store the actual date for reference
+      };
+    });
+    return formattedData
   } catch (error: any) {
     console.error("[GET_GRAPH_REVENUE]", error);
     return [];

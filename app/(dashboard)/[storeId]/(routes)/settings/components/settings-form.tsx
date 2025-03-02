@@ -59,7 +59,9 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
         return;
       }
       await axios.patch(`/api/stores/${params.storeId}`, data);
-      router.refresh();
+      setTimeout(() => {
+        router.refresh();
+      }, 300);
       toast.success('Store updated.');
     } catch (error: any) {
       toast.error('Something went wrong.');
@@ -76,8 +78,8 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
         return;
       }
       await axios.delete(`/api/stores/${params.storeId}`);
-      router.refresh();
       router.push('/');
+      router.refresh();
       toast.success('Store deleted.');
     } catch (error: any) {
       toast.error('Make sure you removed all products and categories first.');

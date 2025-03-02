@@ -36,7 +36,9 @@ export const CellAction: React.FC<CellActionProps> = ({
       if (params && params.storeId) {
         await axios.delete(`/api/${params.storeId}/colors/${data.id}`);
         toast.success('Color deleted.');
-        router.refresh();
+        setTimeout(() => {
+          router.refresh();
+        }, 300);
       } else {
         toast.error('Store ID not found.');
       }

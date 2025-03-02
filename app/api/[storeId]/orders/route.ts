@@ -3,6 +3,9 @@ import prismadb from "@/lib/prismadb";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/currency";
 
+// Add this to prevent caching
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   req: Request,
   { params }: { params: { storeId: string } }

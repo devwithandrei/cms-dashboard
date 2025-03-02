@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs';
 
 import prismadb from '@/lib/prismadb';
+
+// Add this to prevent caching
+export const dynamic = 'force-dynamic';
  
 export async function POST(
   req: Request,
@@ -68,6 +71,12 @@ export async function GET(
     const categories = await prismadb.category.findMany({
       where: {
         storeId: params.storeId
+      },
+      include: {
+        billboard: true,
+      },
+      orderBy: {
+        createdAt: 'desc'
       }
     });
   

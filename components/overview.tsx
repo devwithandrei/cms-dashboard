@@ -1,42 +1,28 @@
 "use client";
 
-import { ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, ComposedChart, Area } from "recharts";
 import { motion, useAnimation } from "framer-motion";
 import { useEffect, useState, useMemo, useRef } from "react";
-import { format, subDays, addDays, subMonths, addMonths, subYears, addYears } from "date-fns";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar as CalendarIcon } from "lucide-react";
+import { format, subDays, addDays, isSameDay, isToday } from "date-fns";
+import { Calendar as CalendarIcon, Info } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-
-type DataView = "hourly" | "daily" | "monthly" | "yearly";
+import { ArrowUp, ArrowDown, Minus, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, DollarSign, BarChart3 } from "lucide-react";
+import { RevenueChart } from "./revenue-chart";
 
 interface GraphData {
   name: string;
   total: number;
   orderCount: number;
-  averageOrderValue: number;
-  dailyData: {
-    date: Date;
-    total: number;
-    orderCount: number;
-    hourlyData: {
-      hour: number;
-      total: number;
-      orderCount: number;
-    }[];
-  }[];
-  createdAt: Date;
-}
-
-interface Stats {
-  max: number;
-  min: number;
-  avg: number;
-  growth: number;
+  growth: number; // Growth percentage compared to previous period
+  trend: 'up' | 'down' | 'stable'; // Trend indicator
+  date: Date; // Date property for sorting and reference
+  isSelected?: boolean; // Added for chart highlighting
+  isCurrentMonth?: boolean; // Added for styling
+  isToday?: boolean; // Added for today highlighting
+  month?: string; // Month name for monthly view
+  year?: number; // Year for monthly view
 }
 
 interface OverviewProps {
@@ -46,16 +32,28 @@ interface OverviewProps {
 export const Overview: React.FC<OverviewProps> = ({
   data = []
 }) => {
-  const [dataView, setDataView] = useState<DataView>("daily");
+  // View mode state (daily or monthly)
+  const [viewMode, setViewMode] = useState<'daily' | 'monthly'>('daily');
+  const activeTab = "revenue";
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [dragDelta, setDragDelta] = useState(0);
+  const [hoveredPoint, setHoveredPoint] = useState<number | null>(null);
+  const [animationComplete, setAnimationComplete] = useState(false);
   const controls = useAnimation();
-  const chartRef = useRef<any>(null);
+  const chartRef = useRef<HTMLDivElement>(null);
+  const [showInfoTooltip, setShowInfoTooltip] = useState(false);
 
   useEffect(() => {
     controls.start({ opacity: 1, y: 0 });
+    
+    // Start the chart animation sequence
+    const animationTimer = setTimeout(() => {
+      setAnimationComplete(true);
+    }, 1500);
+    
+    return () => clearTimeout(animationTimer);
   }, [controls]);
 
   useEffect(() => {
@@ -69,7 +67,7 @@ export const Overview: React.FC<OverviewProps> = ({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentDate, dataView]);
+  }, [currentDate]);
 
   const onMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
@@ -132,414 +130,351 @@ export const Overview: React.FC<OverviewProps> = ({
   };
 
   const navigateForward = () => {
-    switch (dataView) {
-      case "hourly":
-        setCurrentDate(addDays(currentDate, 1));
-        break;
-      case "daily":
-        setCurrentDate(addMonths(currentDate, 1));
-        break;
-      case "monthly":
-        setCurrentDate(addMonths(currentDate, 1));
-        break;
-      case "yearly":
-        setCurrentDate(addYears(currentDate, 1));
-        break;
+    if (viewMode === 'daily') {
+      setCurrentDate(addDays(currentDate, 1));
+    } else {
+      // For monthly view, navigate to next month
+      const nextMonth = new Date(currentDate);
+      nextMonth.setMonth(nextMonth.getMonth() + 1);
+      setCurrentDate(nextMonth);
     }
   };
 
   const navigateBackward = () => {
-    switch (dataView) {
-      case "hourly":
-        setCurrentDate(subDays(currentDate, 1));
-        break;
-      case "daily":
-        setCurrentDate(subMonths(currentDate, 1));
-        break;
-      case "monthly":
-        setCurrentDate(subMonths(currentDate, 1));
-        break;
-      case "yearly":
-        setCurrentDate(subYears(currentDate, 1));
-        break;
+    if (viewMode === 'daily') {
+      setCurrentDate(subDays(currentDate, 1));
+    } else {
+      // For monthly view, navigate to previous month
+      const prevMonth = new Date(currentDate);
+      prevMonth.setMonth(prevMonth.getMonth() - 1);
+      setCurrentDate(prevMonth);
     }
   };
 
   const getCurrentLabel = () => {
-    switch (dataView) {
-      case "hourly":
-        return format(currentDate, "MMM d, yyyy");
-      case "daily":
-        return format(currentDate, "MMMM yyyy");
-      case "monthly":
-        return format(currentDate, "MMMM yyyy");
-      case "yearly":
-        return format(currentDate, "yyyy");
-      default:
-        return "";
+    if (viewMode === 'daily') {
+      return format(currentDate, "MMMM d, yyyy");
+    } else {
+      return format(currentDate, "MMMM yyyy");
     }
-  };
-
-  // Helper function to highlight the current time period
-  const highlightCurrentPeriod = (data: any[]) => {
-    if (!data.length) return data;
-    
-    // Find the index that corresponds to the current time period
-    let currentIndex = -1;
-    
-    switch (dataView) {
-      case "hourly": {
-        const currentHour = new Date().getHours();
-        currentIndex = data.findIndex(d => d.hour === currentHour);
-        break;
-      }
-      case "daily": {
-        const currentDay = currentDate.getDate();
-        currentIndex = data.findIndex(d => d.day === currentDay);
-        break;
-      }
-      case "monthly": {
-        const currentMonth = currentDate.getMonth();
-        currentIndex = data.findIndex(d => d.month === currentMonth);
-        break;
-      }
-      case "yearly": {
-        const currentYear = currentDate.getFullYear();
-        currentIndex = data.findIndex(d => d.year === currentYear);
-        break;
-      }
-    }
-    
-    // If we found the current period, highlight it
-    if (currentIndex >= 0) {
-      return data.map((item, index) => ({
-        ...item,
-        isCurrent: index === currentIndex
-      }));
-    }
-    
-    return data;
-  };
-
-  const processData = () => {
-    if (!data || !data.length) return [];
-
-    switch (dataView) {
-      case "hourly": {
-        const currentMonthData = data.find(month => 
-          new Date(month.createdAt).getMonth() === currentDate.getMonth() &&
-          new Date(month.createdAt).getFullYear() === currentDate.getFullYear()
-        );
-
-        if (!currentMonthData) return [];
-
-        const currentDayData = currentMonthData.dailyData.find(day =>
-          new Date(day.date).getDate() === currentDate.getDate()
-        );
-
-        if (!currentDayData) return [];
-
-        // Sort hourly data by hour to ensure correct growth calculation
-        const sortedHourlyData = [...currentDayData.hourlyData]
-          .sort((a, b) => a.hour - b.hour);
-
-        const hourlyData = sortedHourlyData.map(hour => ({
-          name: `${String(hour.hour).padStart(2, '0')}:00`,
-          total: hour.total,
-          orderCount: hour.orderCount,
-          hour: hour.hour // Keep hour for sorting
-        }));
-        
-        return highlightCurrentPeriod(hourlyData);
-      }
-
-      case "daily": {
-        const currentMonth = currentDate.getMonth();
-        const currentYear = currentDate.getFullYear();
-        const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-        
-        // Create a template for all days in the month
-        const daysTemplate = Array.from({ length: daysInMonth }, (_, i) => {
-          const day = i + 1;
-          return {
-            name: format(new Date(currentYear, currentMonth, day), "d MMM"),
-            day,
-            total: 0,
-            orderCount: 0,
-            averageOrderValue: 0
-          };
-        });
-        
-        // Find the current month data
-        const currentMonthData = data.find(month => 
-          new Date(month.createdAt).getMonth() === currentMonth &&
-          new Date(month.createdAt).getFullYear() === currentYear
-        );
-        
-        if (currentMonthData && currentMonthData.dailyData) {
-          // Sort daily data by date to ensure correct growth calculation
-          const sortedDailyData = [...currentMonthData.dailyData]
-            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-          
-          // Fill in actual data where available
-          sortedDailyData.forEach(dayData => {
-            const dayDate = new Date(dayData.date);
-            const dayOfMonth = dayDate.getDate() - 1; // 0-based index
-            
-            if (dayOfMonth >= 0 && dayOfMonth < daysTemplate.length) {
-              // Calculate total for the day
-              const dayTotal = dayData.hourlyData.reduce((sum, hour) => sum + hour.total, 0);
-              const dayOrderCount = dayData.hourlyData.reduce((sum, hour) => sum + hour.orderCount, 0);
-              
-              daysTemplate[dayOfMonth].total = dayTotal;
-              daysTemplate[dayOfMonth].orderCount = dayOrderCount;
-              daysTemplate[dayOfMonth].averageOrderValue = dayOrderCount > 0 
-                ? dayTotal / dayOrderCount 
-                : 0;
-            }
-          });
-        }
-        
-        return highlightCurrentPeriod(daysTemplate);
-      }
-
-      case "monthly": {
-        const currentYear = currentDate.getFullYear();
-        
-        // Create a template for all 12 months
-        const monthsTemplate = Array.from({ length: 12 }, (_, i) => ({
-          name: format(new Date(currentYear, i, 1), "MMM"),
-          month: i,
-          total: 0,
-          orderCount: 0,
-          averageOrderValue: 0
-        }));
-        
-        // Filter and sort data for the current year
-        const currentYearData = data
-          .filter(item => new Date(item.createdAt).getFullYear() === currentYear)
-          .sort((a, b) => new Date(a.createdAt).getMonth() - new Date(b.createdAt).getMonth());
-        
-        // Fill in actual data where available
-        currentYearData.forEach(item => {
-          const itemMonth = new Date(item.createdAt).getMonth();
-          
-          if (itemMonth >= 0 && itemMonth < 12) {
-            monthsTemplate[itemMonth].total = item.total;
-            monthsTemplate[itemMonth].orderCount = item.orderCount;
-            monthsTemplate[itemMonth].averageOrderValue = item.averageOrderValue || 
-              (item.orderCount > 0 ? item.total / item.orderCount : 0);
-          }
-        });
-        
-        return highlightCurrentPeriod(monthsTemplate);
-      }
-
-      case "yearly": {
-        // Find min and max years in the data
-        let minYear = Infinity;
-        let maxYear = -Infinity;
-        
-        data.forEach(item => {
-          const year = new Date(item.createdAt).getFullYear();
-          minYear = Math.min(minYear, year);
-          maxYear = Math.max(maxYear, year);
-        });
-        
-        // If no data, use current year as reference
-        if (minYear === Infinity) {
-          minYear = currentDate.getFullYear() - 2;
-          maxYear = currentDate.getFullYear() + 2;
-        } else {
-          // Add past and future years
-          minYear = Math.min(minYear, currentDate.getFullYear() - 2);
-          maxYear = Math.max(maxYear, currentDate.getFullYear() + 2);
-        }
-        
-        // Create a template for all years in range
-        const yearsTemplate = Array.from(
-          { length: maxYear - minYear + 1 }, 
-          (_, i) => ({
-            name: (minYear + i).toString(),
-            year: minYear + i,
-            total: 0,
-            orderCount: 0,
-            averageOrderValue: 0
-          })
-        );
-        
-        // Group data by year and calculate totals
-        const yearlyData = data.reduce((acc, month) => {
-          const year = new Date(month.createdAt).getFullYear();
-          
-          if (!acc[year]) {
-            acc[year] = {
-              total: 0,
-              orderCount: 0,
-              totalValue: 0
-            };
-          }
-          
-          acc[year].total += month.total;
-          acc[year].orderCount += month.orderCount;
-          acc[year].totalValue += month.total;
-          
-          return acc;
-        }, {} as Record<number, any>);
-        
-        // Fill in actual data where available
-        yearsTemplate.forEach(yearTemplate => {
-          const yearData = yearlyData[yearTemplate.year];
-          if (yearData) {
-            yearTemplate.total = yearData.total;
-            yearTemplate.orderCount = yearData.orderCount;
-            yearTemplate.averageOrderValue = yearData.orderCount 
-              ? yearData.totalValue / yearData.orderCount 
-              : 0;
-          }
-        });
-        
-        // Sort by year to ensure correct growth calculation
-        const sortedData = yearsTemplate.sort((a, b) => a.year - b.year);
-        return highlightCurrentPeriod(sortedData);
-      }
-    }
-  };
-
-  const chartData = useMemo(() => {
-    return processData();
-  }, [dataView, data, currentDate]);
-
-  const stats = useMemo((): Stats | null => {
-    if (!chartData.length) return null;
-    
-    // Get all totals for basic stats
-    const allTotals = chartData.map(d => d.total);
-    const nonZeroTotals = allTotals.filter(t => t > 0);
-    
-    if (!nonZeroTotals.length) return { max: 0, min: 0, avg: 0, growth: 0 };
-    
-    const max = Math.max(...nonZeroTotals);
-    const min = Math.min(...nonZeroTotals);
-    
-    // Calculate weighted average based on order count
-    const totalRevenue = chartData.reduce((sum, d) => sum + d.total, 0);
-    const totalOrders = chartData.reduce((sum, d) => sum + (d.orderCount || 0), 0);
-    const avg = totalOrders > 0 ? totalRevenue / totalOrders : 
-      nonZeroTotals.reduce((a, b) => a + b, 0) / nonZeroTotals.length;
-    
-    // Calculate growth based on the view type
-    let growth = 0;
-    
-    // Calculate growth differently based on the view type
-    switch (dataView) {
-      case "hourly": {
-        // For hourly view, compare with previous hour
-        const nonZeroData = chartData.filter(d => d.total > 0);
-        
-        if (nonZeroData.length >= 2) {
-          const firstValue = nonZeroData[0].total;
-          const lastValue = nonZeroData[nonZeroData.length - 1].total;
-          
-          growth = firstValue ? ((lastValue - firstValue) / firstValue) * 100 : 0;
-        }
-        break;
-      }
-      
-      case "daily": {
-        // For daily view, compare with previous day
-        const nonZeroData = chartData.filter(d => d.total > 0);
-        
-        if (nonZeroData.length >= 2) {
-          const firstValue = nonZeroData[0].total;
-          const lastValue = nonZeroData[nonZeroData.length - 1].total;
-          
-          growth = firstValue ? ((lastValue - firstValue) / firstValue) * 100 : 0;
-        }
-        break;
-      }
-      
-      case "monthly": {
-        // For monthly view, compare current month with previous month
-        const currentMonthIndex = currentDate.getMonth();
-        const previousMonthIndex = currentMonthIndex > 0 ? currentMonthIndex - 1 : 11;
-        
-        const currentMonthData = chartData.find(d => d.month === currentMonthIndex);
-        const previousMonthData = chartData.find(d => d.month === previousMonthIndex);
-        
-        if (currentMonthData && previousMonthData && previousMonthData.total > 0) {
-          growth = ((currentMonthData.total - previousMonthData.total) / previousMonthData.total) * 100;
-        } else if (currentMonthData && currentMonthData.total > 0) {
-          // If no previous month data, show 100% growth
-          growth = 100;
-        }
-        break;
-      }
-      
-      case "yearly": {
-        // For yearly view, compare current year with previous year
-        const currentYear = currentDate.getFullYear();
-        const previousYear = currentYear - 1;
-        
-        const currentYearData = chartData.find(d => d.year === currentYear);
-        const previousYearData = chartData.find(d => d.year === previousYear);
-        
-        if (currentYearData && previousYearData && previousYearData.total > 0) {
-          growth = ((currentYearData.total - previousYearData.total) / previousYearData.total) * 100;
-        } else if (currentYearData && currentYearData.total > 0) {
-          // If no previous year data, show 100% growth
-          growth = 100;
-        }
-        break;
-      }
-    }
-
-    return { max, min, avg, growth };
-  }, [chartData, dataView, currentDate]);
-
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      const currentData = payload[0].payload;
-      
-      return (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="bg-[#0a101f]/95 backdrop-blur-sm p-4 rounded-xl shadow-lg border border-gray-800/50"
-        >
-          <div className="font-bold text-lg mb-2 bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">{label}</div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-gray-400">Revenue:</span>
-              <span className="font-bold bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">
-                €{(currentData.total || 0).toFixed(2)}
-              </span>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-gray-400">Orders:</span>
-              <span className="font-bold text-blue-400">
-                {currentData.orderCount || 0}
-              </span>
-            </div>
-            {currentData.averageOrderValue && (
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-gray-400">Avg. Order:</span>
-                <span className="font-bold text-purple-400">
-                  €{currentData.averageOrderValue.toFixed(2)}
-                </span>
-              </div>
-            )}
-          </div>
-        </motion.div>
-      );
-    }
-    return null;
   };
 
   const handleDateSelect = (date: Date | undefined) => {
     if (!date) return;
     setCurrentDate(date);
+    // The scrolling will be handled by the useEffect hook
   };
+
+  // Calculate overall stats
+  const stats = useMemo(() => {
+    if (!data.length) return { totalRevenue: 0, totalOrders: 0, avgGrowth: 0 };
+    
+    const totalRevenue = data.reduce((sum, item) => sum + item.total, 0);
+    const totalOrders = data.reduce((sum, item) => sum + item.orderCount, 0);
+    
+    // Calculate average growth (excluding zero values)
+    const growthValues = data.filter(item => item.growth !== 0).map(item => item.growth);
+    const avgGrowth = growthValues.length > 0 
+      ? growthValues.reduce((sum, val) => sum + val, 0) / growthValues.length 
+      : 0;
+    
+    return { totalRevenue, totalOrders, avgGrowth };
+  }, [data]);
+
+  // Process data for monthly view
+  const monthlyData = useMemo(() => {
+    if (!data.length) return [];
+    
+    // Filter data to only include items with date property
+    const validData = [...data].filter(item => item.date instanceof Date);
+    
+    // Group data by month and year
+    const monthlyGroups = new Map();
+    
+    validData.forEach(item => {
+      const date = new Date(item.date);
+      const monthYear = format(date, 'MMM yyyy');
+      const monthIndex = date.getMonth();
+      const year = date.getFullYear();
+      
+      if (!monthlyGroups.has(monthYear)) {
+        monthlyGroups.set(monthYear, {
+          name: monthYear,
+          total: 0,
+          orderCount: 0,
+          date: new Date(year, monthIndex, 1), // First day of month
+          month: format(date, 'MMMM'),
+          year: year,
+          isCurrentMonth: date.getMonth() === currentDate.getMonth() && 
+                          date.getFullYear() === currentDate.getFullYear(),
+          isSelected: date.getMonth() === currentDate.getMonth() && 
+                      date.getFullYear() === currentDate.getFullYear()
+        });
+      }
+      
+      const monthData = monthlyGroups.get(monthYear);
+      monthData.total += item.total;
+      monthData.orderCount += item.orderCount;
+    });
+    
+    // Convert to array and sort by date
+    const result = Array.from(monthlyGroups.values())
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
+    
+    // Calculate growth for each month
+    result.forEach((item, index) => {
+      if (index > 0) {
+        const prevMonth = result[index - 1];
+        if (prevMonth.total > 0) {
+          item.growth = ((item.total - prevMonth.total) / prevMonth.total) * 100;
+        } else if (item.total > 0) {
+          item.growth = 100; // If previous month was 0 and current is positive
+        } else {
+          item.growth = 0;
+        }
+        
+        // Determine trend
+        if (item.growth > 5) {
+          item.trend = "up";
+        } else if (item.growth < -5) {
+          item.trend = "down";
+        } else {
+          item.trend = "stable";
+        }
+      } else {
+        item.growth = 0;
+        item.trend = "stable";
+      }
+    });
+    
+    return result;
+  }, [data, currentDate]);
+
+  // Get data for the selected metric and highlight the selected date
+  const dailyChartData = useMemo(() => {
+    if (!data.length) return [];
+      
+    // Filter data to only include items with date property and sort by date
+    const sortedData = [...data]
+      .filter((item) => item.date instanceof Date)
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
+  
+    // Always show all available data points for the revenue line
+    // Create a map for quick lookup of data by date
+    const dataMap = new Map(
+      sortedData.map((item) => [format(item.date, "yyyy-MM-dd"), item])
+    );
+  
+    // Find the earliest and latest dates in the data
+    const earliestDate = sortedData[0].date;
+    const latestDate = sortedData[sortedData.length - 1].date;
+    
+    // Calculate the number of days between earliest and latest dates
+    const dayCount = Math.round((latestDate.getTime() - earliestDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    
+    // Generate an array of all dates in the range
+    const displayData = [];
+    for (let i = 0; i < dayCount; i++) {
+      const currentDateInRange = addDays(
+        new Date(earliestDate),
+        i
+      );
+      
+      const dateKey = format(currentDateInRange, "yyyy-MM-dd");
+      let dataPoint = dataMap.get(dateKey);
+  
+      if (!dataPoint) {
+        // If no data for this date, create a placeholder with zero values
+        dataPoint = {
+          name: format(currentDateInRange, "MMM dd"),
+          total: 0,
+          orderCount: 0,
+          growth: 0,
+          trend: "stable" as const,
+          date: currentDateInRange,
+          isSelected: isSameDay(currentDateInRange, currentDate),
+          isCurrentMonth: currentDateInRange.getMonth() === currentDate.getMonth(),
+          isToday: isToday(currentDateInRange),
+        };
+      } else {
+        // Ensure the name is in the correct format (MMM dd)
+        dataPoint = {
+          ...dataPoint,
+          name: format(dataPoint.date, "MMM dd"),
+          isSelected: isSameDay(dataPoint.date, currentDate),
+          isCurrentMonth: currentDateInRange.getMonth() === currentDate.getMonth(),
+          isToday: isToday(currentDateInRange),
+        };
+      }
+      displayData.push(dataPoint);
+    }
+  
+    return displayData;
+  }, [data, activeTab, currentDate]);
+  
+  // Get data for the current month (for monthly view)
+  const currentMonthData = useMemo(() => {
+    if (!data.length) return [];
+    
+    // Filter the original data to get only items with date property
+    const validData = [...data].filter(item => item.date instanceof Date);
+    
+    // Create a map for quick lookup of data by date
+    const dataMap = new Map(
+      validData.map(item => [format(item.date, "yyyy-MM-dd"), item])
+    );
+    
+    // Get the first day of the month
+    const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    
+    // Get the last day of the month
+    const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+    
+    // Calculate the number of days in the month
+    const daysInMonth = lastDayOfMonth.getDate();
+    
+    // Generate an array of all days in the month
+    const monthData: GraphData[] = [];
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+      const dateKey = format(date, "yyyy-MM-dd");
+      let dataPoint = dataMap.get(dateKey);
+      
+      if (!dataPoint) {
+        // If no data for this date, create a placeholder with zero values
+        dataPoint = {
+          name: format(date, "dd"), // Just show the day number for monthly view
+          total: 0,
+          orderCount: 0,
+          growth: 0,
+          trend: "stable" as const,
+          date: date,
+          isSelected: isSameDay(date, currentDate),
+          isCurrentMonth: true,
+          isToday: isToday(date),
+          month: format(date, 'MMMM'),
+          year: date.getFullYear()
+        };
+      } else {
+        // Ensure the name is in the correct format (just the day number)
+        dataPoint = {
+          ...dataPoint,
+          name: format(date, "dd"), // Just show the day number for monthly view
+          isSelected: isSameDay(date, currentDate),
+          isCurrentMonth: true,
+          isToday: isToday(date),
+          month: format(date, 'MMMM'),
+          year: date.getFullYear()
+        };
+      }
+      
+      monthData.push(dataPoint);
+    }
+    
+    // Calculate growth for each day compared to previous day
+    monthData.forEach((item, index) => {
+      if (index > 0) {
+        const prevDay = monthData[index - 1];
+        if (prevDay.total > 0) {
+          item.growth = ((item.total - prevDay.total) / prevDay.total) * 100;
+        } else if (item.total > 0) {
+          item.growth = 100; // If previous day was 0 and current is positive
+        } else {
+          item.growth = 0;
+        }
+        
+        // Determine trend
+        if (item.growth > 5) {
+          item.trend = "up";
+        } else if (item.growth < -5) {
+          item.trend = "down";
+        } else {
+          item.trend = "stable";
+        }
+      } else {
+        // For the first day of the month, compare with the last day of previous month if available
+        const lastDayOfPrevMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0);
+        const lastDayKey = format(lastDayOfPrevMonth, "yyyy-MM-dd");
+        const lastDayData = dataMap.get(lastDayKey);
+        
+        if (lastDayData && lastDayData.total > 0) {
+          item.growth = ((item.total - lastDayData.total) / lastDayData.total) * 100;
+        } else if (item.total > 0) {
+          item.growth = 100;
+        } else {
+          item.growth = 0;
+        }
+        
+        // Determine trend
+        if (item.growth > 5) {
+          item.trend = "up";
+        } else if (item.growth < -5) {
+          item.trend = "down";
+        } else {
+          item.trend = "stable";
+        }
+      }
+    });
+    
+    return monthData;
+  }, [data, currentDate]);
+  
+  // Choose which data to display based on view mode
+  const chartData = useMemo(() => {
+    return viewMode === 'daily' ? dailyChartData : currentMonthData;
+  }, [viewMode, dailyChartData, currentMonthData]);
+  
+  // Get the selected day's or month's revenue
+  const selectedRevenue = useMemo(() => {
+    if (!data.length) return 0;
+    
+    if (viewMode === 'daily') {
+      // Find an exact match for the selected day using the date property
+      const exactMatch = data.find(item => 
+        item.date instanceof Date && 
+        isSameDay(item.date, currentDate)
+      );
+      
+      return exactMatch ? exactMatch.total : 0;
+    } else {
+      // For monthly view, find the matching month in our processed monthly data
+      const monthMatch = monthlyData.find(item => 
+        item.date.getMonth() === currentDate.getMonth() && 
+        item.date.getFullYear() === currentDate.getFullYear()
+      );
+      
+      return monthMatch ? monthMatch.total : 0;
+    }
+  }, [data, currentDate, viewMode, monthlyData]);
+  
+  // Scroll to the selected date when currentDate changes
+  useEffect(() => {
+    if (!chartRef.current || !chartData.length) return;
+    
+    // Find the index of the selected date in the chart data
+    const selectedIndex = chartData.findIndex(item => {
+      if (viewMode === 'daily') {
+        return item.date instanceof Date && isSameDay(item.date, currentDate);
+      } else {
+        return item.date instanceof Date && 
+               item.date.getMonth() === currentDate.getMonth() && 
+               item.date.getFullYear() === currentDate.getFullYear();
+      }
+    });
+    
+    // If found, scroll to that position in the chart
+    if (selectedIndex >= 0) {
+      const chartContainer = chartRef.current;
+      const itemWidth = viewMode === 'daily' ? 30 : 100; // Monthly data points are wider
+      const scrollPosition = Math.max(0, (selectedIndex * itemWidth) - (chartContainer.clientWidth / 2) + (itemWidth / 2));
+      
+      // Use smooth scrolling for better UX
+      chartContainer.scrollTo({
+        left: scrollPosition,
+        behavior: 'smooth'
+      });
+    }
+  }, [currentDate, chartData, viewMode]);
 
   return (
     <motion.div 
@@ -547,73 +482,210 @@ export const Overview: React.FC<OverviewProps> = ({
       initial={{ opacity: 0, y: 20 }}
       animate={controls}
     >
-      <div className="flex justify-between items-start flex-wrap gap-4">
-        <div className="flex justify-center flex-grow">
-          <Tabs value={dataView} onValueChange={(value) => setDataView(value as DataView)}>
-            <TabsList className="grid w-full max-w-md grid-cols-4 bg-[#0a101f]/50 backdrop-blur-sm rounded-xl p-1">
-              <TabsTrigger 
-                value="hourly"
-                className={cn(
-                  "data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-600 data-[state=active]:to-indigo-600",
-                  "data-[state=active]:text-white rounded-lg",
-                  "text-gray-400 data-[state=active]:from-violet-500 data-[state=active]:to-indigo-500",
-                  "transition-all duration-300"
-                )}
-              >
-                Hourly
-              </TabsTrigger>
-              <TabsTrigger 
-                value="daily"
-                className={cn(
-                  "data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-600 data-[state=active]:to-indigo-600",
-                  "data-[state=active]:text-white rounded-lg",
-                  "text-gray-400 data-[state=active]:from-violet-500 data-[state=active]:to-indigo-500",
-                  "transition-all duration-300"
-                )}
-              >
-                Daily
-              </TabsTrigger>
-              <TabsTrigger 
-                value="monthly"
-                className={cn(
-                  "data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-600 data-[state=active]:to-indigo-600",
-                  "data-[state=active]:text-white rounded-lg",
-                  "text-gray-400 data-[state=active]:from-violet-500 data-[state=active]:to-indigo-500",
-                  "transition-all duration-300"
-                )}
-              >
-                Monthly
-              </TabsTrigger>
-              <TabsTrigger 
-                value="yearly"
-                className={cn(
-                  "data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-600 data-[state=active]:to-indigo-600",
-                  "data-[state=active]:text-white rounded-lg",
-                  "text-gray-400 data-[state=active]:from-violet-500 data-[state=active]:to-indigo-500",
-                  "transition-all duration-300"
-                )}
-              >
-                Yearly
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <motion.div 
+          className="bg-[#0a101f]/50 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-gray-800/50 overflow-hidden relative"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          whileHover={{ scale: 1.02 }}
+        >
+          <motion.div 
+            className="absolute -right-10 -top-10 w-32 h-32 bg-violet-500/10 rounded-full blur-xl"
+            animate={{ 
+              scale: [1, 1.2, 1],
+              opacity: [0.5, 0.8, 0.5]
+            }}
+            transition={{ 
+              duration: 8, 
+              repeat: Infinity,
+              repeatType: "reverse" 
+            }}
+          />
+          <div className="text-sm text-gray-400">Total Revenue</div>
+          <motion.div 
+            className="text-2xl font-bold bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.3, type: "spring" }}
+          >
+            €{stats.totalRevenue.toFixed(2)}
+          </motion.div>
+          <div className={cn(
+            "text-xs flex items-center mt-1",
+            stats.avgGrowth > 0 ? "text-emerald-400" : 
+            stats.avgGrowth < 0 ? "text-red-400" : "text-gray-400"
+          )}>
+            {stats.avgGrowth > 0 ? <TrendingUp className="w-3 h-3 mr-1" /> : 
+             stats.avgGrowth < 0 ? <TrendingDown className="w-3 h-3 mr-1" /> : 
+             <Minus className="w-3 h-3 mr-1" />}
+            {Math.abs(stats.avgGrowth).toFixed(1)}% avg growth
+          </div>
+        </motion.div>
+        
+        <motion.div 
+          className="bg-[#0a101f]/50 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-gray-800/50 overflow-hidden relative"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          whileHover={{ scale: 1.02 }}
+        >
+          <motion.div 
+            className="absolute -right-10 -top-10 w-32 h-32 bg-blue-500/10 rounded-full blur-xl"
+            animate={{ 
+              scale: [1, 1.2, 1],
+              opacity: [0.5, 0.8, 0.5]
+            }}
+            transition={{ 
+              duration: 7, 
+              repeat: Infinity,
+              repeatType: "reverse",
+              delay: 1
+            }}
+          />
+          <div className="text-sm text-gray-400">Total Orders</div>
+          <motion.div 
+            className="text-2xl font-bold text-blue-400"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.4, type: "spring" }}
+          >
+            {stats.totalOrders}
+          </motion.div>
+        </motion.div>
+        
+        <motion.div 
+          className="bg-[#0a101f]/50 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-gray-800/50 overflow-hidden relative"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          whileHover={{ scale: 1.02 }}
+        >
+          <motion.div 
+            className="absolute -right-10 -top-10 w-32 h-32 bg-indigo-500/10 rounded-full blur-xl"
+            animate={{ 
+              scale: [1, 1.2, 1],
+              opacity: [0.5, 0.8, 0.5]
+            }}
+            transition={{ 
+              duration: 9, 
+              repeat: Infinity,
+              repeatType: "reverse",
+              delay: 2
+            }}
+          />
+          <div className="text-sm text-gray-400">
+            {viewMode === 'daily' ? 'Selected Day Revenue' : 'Selected Month Revenue'}
+          </div>
+          <motion.div 
+            className="text-2xl font-bold bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.5, type: "spring" }}
+          >
+            €{selectedRevenue.toFixed(2)}
+          </motion.div>
+          <div className="text-xs text-gray-400 mt-1">
+            {viewMode === 'daily' 
+              ? format(currentDate, "MMMM d, yyyy")
+              : format(currentDate, "MMMM yyyy")}
+          </div>
+        </motion.div>
+      </div>
 
-        <div className="flex items-center gap-4">
-          <h2 className="text-lg font-semibold bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">
-            {getCurrentLabel()}
+      {/* Chart Controls */}
+      <div className="flex justify-between items-center flex-wrap gap-4">
+        <div className="flex items-center gap-2">
+          <h2 className="text-xl font-bold bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">
+            Revenue Analytics
           </h2>
-          <Popover>
+          
+          {/* View mode toggle */}
+          <div className="flex items-center bg-[#0a101f]/70 rounded-lg p-1 ml-2">
+            <motion.button
+              onClick={() => setViewMode('daily')}
+              className={cn(
+                "px-3 py-1 text-xs rounded-md transition-all",
+                viewMode === 'daily' 
+                  ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg" 
+                  : "text-gray-400 hover:text-gray-200"
+              )}
+              whileHover={{ scale: viewMode === 'daily' ? 1 : 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              Daily
+            </motion.button>
+            <motion.button
+              onClick={() => setViewMode('monthly')}
+              className={cn(
+                "px-3 py-1 text-xs rounded-md transition-all",
+                viewMode === 'monthly' 
+                  ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg" 
+                  : "text-gray-400 hover:text-gray-200"
+              )}
+              whileHover={{ scale: viewMode === 'monthly' ? 1 : 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              Monthly
+            </motion.button>
+          </div>
+          
+          <Popover open={showInfoTooltip} onOpenChange={setShowInfoTooltip}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
-                className={cn(
-                  "w-10 h-10 p-0 bg-[#0a101f]/50 backdrop-blur-sm rounded-xl shadow-lg border border-gray-800/50",
-                  "hover:scale-110 transition-transform"
-                )}
+                size="icon"
+                className="w-6 h-6 rounded-full bg-[#0a101f]/50 border border-gray-800/50 hover:bg-gray-800/50"
+                onClick={() => setShowInfoTooltip(!showInfoTooltip)}
+              >
+                <Info className="h-3 w-3 text-gray-400" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-4 bg-[#0a101f]/95 backdrop-blur-sm border border-gray-800/50 text-gray-300 text-sm">
+              <p>This chart shows your {viewMode} revenue trends. You can:</p>
+              <ul className="list-disc pl-5 mt-2 space-y-1">
+                <li>Switch between daily and monthly views</li>
+                <li>Drag the chart to navigate through {viewMode === 'daily' ? 'dates' : 'months'}</li>
+                <li>Click on data points to see detailed information</li>
+                <li>Use the calendar to jump to specific dates</li>
+                <li>Use arrow buttons to navigate {viewMode === 'daily' ? 'day by day' : 'month by month'}</li>
+              </ul>
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <motion.button
+            onClick={navigateBackward}
+            className="p-2 bg-[#0a101f]/50 backdrop-blur-sm rounded-full shadow-lg border border-gray-800/50 hover:bg-gray-800/30 transition-all"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <ChevronLeft className="w-4 h-4 text-gray-400" />
+          </motion.button>
+          
+          <motion.h2 
+            className="text-lg font-semibold bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent"
+            key={currentDate.toString() + viewMode}
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 20 }}
+          >
+            {viewMode === 'daily' 
+              ? format(currentDate, "MMMM d, yyyy")
+              : format(currentDate, "MMMM yyyy")}
+          </motion.h2>
+          
+          <Popover>
+            <PopoverTrigger asChild>
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                className="w-10 h-10 p-0 bg-[#0a101f]/50 backdrop-blur-sm rounded-xl shadow-lg border border-gray-800/50 flex items-center justify-center"
               >
                 <CalendarIcon className="h-4 w-4 text-gray-400" />
-              </Button>
+              </motion.button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">
               <Calendar
@@ -642,173 +714,32 @@ export const Overview: React.FC<OverviewProps> = ({
               />
             </PopoverContent>
           </Popover>
-        </div>
-
-        {stats && (
-          <div className="flex gap-4 flex-wrap">
-            <motion.div 
-              className="bg-[#0a101f]/50 backdrop-blur-sm rounded-xl p-3 shadow-lg border border-gray-800/50"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.2 }}
-            >
-              <div className="text-sm text-gray-400">Growth</div>
-              <div className={cn(
-                "text-lg font-bold",
-                stats.growth > 0 ? "text-emerald-400" : "text-red-400"
-              )}>
-                {stats.growth ? `${stats.growth.toFixed(1)}%` : '0%'}
-              </div>
-            </motion.div>
-            <motion.div 
-              className="bg-[#0a101f]/50 backdrop-blur-sm rounded-xl p-3 shadow-lg border border-gray-800/50"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <div className="text-sm text-gray-400">Average</div>
-              <div className="text-lg font-bold bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">
-                €{stats.avg.toFixed(2)}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </div>
-
-      <div className="relative chart-container">
-        <div 
-          className="h-[400px] w-full bg-[#0a101f]/50 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-gray-800/50 cursor-grab active:cursor-grabbing overflow-hidden"
-          onMouseDown={onMouseDown}
-          onMouseMove={onMouseMove}
-          onMouseUp={onMouseUp}
-          onMouseLeave={onMouseUp}
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
-          style={{
-            transform: `translateX(${dragDelta}px)`,
-            transition: isDragging ? 'none' : 'transform 0.3s ease-out'
-          }}
-          ref={chartRef}
-        >
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={chartData} margin={{ left: 10 }}>
-              <defs>
-                <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#8B5CF6" stopOpacity={0.3}/>
-                  <stop offset="50%" stopColor="#8B5CF6" stopOpacity={0.1}/>
-                  <stop offset="100%" stopColor="#6366F1" stopOpacity={0.05}/>
-                </linearGradient>
-                <filter id="glow">
-                  <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-                  <feMerge>
-                    <feMergeNode in="coloredBlur"/>
-                    <feMergeNode in="SourceGraphic"/>
-                  </feMerge>
-                </filter>
-              </defs>
-              <CartesianGrid
-                strokeDasharray="3 3"
-                className="stroke-gray-800/50"
-                vertical={false}
-                horizontal={true}
-              />
-              <XAxis
-                dataKey="name"
-                stroke="#888888"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-                className="text-gray-400"
-                dy={10}
-                interval="preserveStartEnd"
-                minTickGap={5}
-              />
-              <YAxis
-                stroke="#888888"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(value: number) => `€${value}`}
-                className="text-gray-400"
-                dx={-10}
-              />
-              <Tooltip
-                cursor={false}
-                content={CustomTooltip}
-                position={{ y: 0 }}
-              />
-              <Area
-                type="monotone"
-                dataKey="total"
-                fill="url(#areaGradient)"
-                stroke="#8B5CF6"
-                strokeWidth={2}
-                filter="url(#glow)"
-                dot={(props) => {
-                  const { cx, cy, payload } = props;
-                  
-                  // Highlight current period with a larger dot
-                  if (payload.isCurrent) {
-                    return (
-                      <circle
-                        cx={cx}
-                        cy={cy}
-                        r={6}
-                        fill="#8B5CF6"
-                        stroke="#030711"
-                        strokeWidth={2}
-                        className="glow-effect"
-                      />
-                    );
-                  }
-                  
-                  return (
-                    <circle
-                      cx={cx}
-                      cy={cy}
-                      r={4}
-                      fill="#8B5CF6"
-                      stroke="#030711"
-                      strokeWidth={2}
-                      className="glow-effect"
-                    />
-                  );
-                }}
-                activeDot={{
-                  r: 6,
-                  fill: "#8B5CF6",
-                  stroke: "#030711",
-                  strokeWidth: 2,
-                  className: "glow-effect"
-                }}
-                isAnimationActive={!isDragging}
-                animationBegin={0}
-                animationDuration={2000}
-                animationEasing="ease-in-out"
-                connectNulls={true}
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
-        
-        <div className="absolute inset-y-0 left-0 flex items-center">
-          <button
-            onClick={navigateBackward}
-            className="p-2 bg-[#0a101f]/50 backdrop-blur-sm rounded-full shadow-lg border border-gray-800/50 transform -translate-x-1/2 hover:scale-110 transition-transform"
-          >
-            <ChevronLeft className="w-5 h-5 text-gray-400" />
-          </button>
-        </div>
-        <div className="absolute inset-y-0 right-0 flex items-center">
-          <button
+          
+          <motion.button
             onClick={navigateForward}
-            className="p-2 bg-[#0a101f]/50 backdrop-blur-sm rounded-full shadow-lg border border-gray-800/50 transform translate-x-1/2 hover:scale-110 transition-transform"
+            className="p-2 bg-[#0a101f]/50 backdrop-blur-sm rounded-full shadow-lg border border-gray-800/50 hover:bg-gray-800/30 transition-all"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
           >
-            <ChevronRight className="w-5 h-5 text-gray-400" />
-          </button>
+            <ChevronRight className="w-4 h-4 text-gray-400" />
+          </motion.button>
         </div>
       </div>
+
+      {/* Chart */}
+      <RevenueChart 
+        chartData={chartData}
+        chartRef={chartRef}
+        isDragging={isDragging}
+        dragDelta={dragDelta}
+        onMouseDown={onMouseDown}
+        onMouseMove={onMouseMove}
+        onMouseUp={onMouseUp}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        activeTab={activeTab}
+      />
     </motion.div>
   );
 };

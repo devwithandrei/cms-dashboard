@@ -1,28 +1,81 @@
-import { redirect } from 'next/navigation';
-import { auth } from '@clerk/nextjs';
+"use client";
 
-import prismadb from '@/lib/prismadb';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@clerk/nextjs';
 
-export default async function SetupLayout({
+import { useStoreModal } from '@/hooks/use-store-modal';
+
+interface SetupLayoutProps {
+  children: React.ReactNode;
+}
+
+export default function SetupLayout({
   children,
-}: {
-  children: React.ReactNode
-}) {
-  const { userId } = auth();
+}: SetupLayoutProps) {
+  const { userId, isLoaded: isAuthLoaded } = useAuth();
+  const storeModal = useStoreModal();
+  const router = useRouter();
+  const [isCheckingStore, setIsCheckingStore] = useState(true);
 
-  if (!userId) {
-    redirect('/sign-in');
-  }
+  useEffect(() => {
+    // Wait for auth to be loaded before checking
+    if (!isAuthLoaded) return;
 
-  const store = await prismadb.store.findFirst({
-    where: {
-      userId,
+    // If no user, redirect to sign-in
+    if (!userId) {
+      window.location.href = '/sign-in';
+      return;
     }
-  });
 
-  if (store) {
-    redirect(`/${store.id}`);
-  };
+    const checkStore = async () => {
+      try {
+        setIsCheckingStore(true);
+        
+        // Use direct API call with no-cache to ensure fresh data
+        const response = await fetch('/api/stores', {
+          method: 'GET',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
+        
+        // Check if the response is ok
+        if (!response.ok) {
+          throw new Error(`Error fetching stores: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.stores && data.stores.length > 0) {
+          // User has stores, redirect to the first one
+          window.location.href = `/${data.stores[0].id}`;
+          return;
+        } else {
+          // User has no stores, open the modal
+          storeModal.onOpen();
+        }
+      } catch (error) {
+        console.error("Error checking store:", error);
+        // Only open modal if we're sure there are no stores
+        storeModal.onOpen();
+      } finally {
+        setIsCheckingStore(false);
+      }
+    };
+
+    checkStore();
+  }, [userId, isAuthLoaded, storeModal, router]);
+
+  // Show loading spinner while checking stores
+  if (isCheckingStore) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+      </div>
+    );
+  }
 
   return (
     <>

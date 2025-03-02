@@ -4,6 +4,9 @@ import { OrderStatus } from "@/types";
 import prismadb from "@/lib/prismadb";
 import { Decimal } from "@prisma/client/runtime/library";
 
+// Add this to prevent caching
+export const dynamic = 'force-dynamic';
+
 interface ProductWithPrice {
   id: string;
   price: Decimal;

@@ -6,6 +6,10 @@ import { formatter } from "@/lib/utils";
 import { ProductsClient } from "./components/client";
 import { ProductColumn } from "./components/columns";
 
+// Add this to prevent caching
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const ProductsPage = async ({
   params
 }: {
