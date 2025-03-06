@@ -22,8 +22,7 @@ export const ModalProvider = () => {
 
   return (
     <>
-      {/* Only render StoreModal when needed */}
-      {isSetupPage && <StoreModal />}
+      <StoreModal />
     </>
   );
 }

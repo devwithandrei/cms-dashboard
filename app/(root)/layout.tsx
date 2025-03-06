@@ -53,13 +53,14 @@ export default function SetupLayout({
           window.location.href = `/${data.stores[0].id}`;
           return;
         } else {
-          // User has no stores, open the modal
-          storeModal.onOpen();
+          // Only open modal if we're sure there are no stores
+          // and we're done checking (prevents flash of UI)
+          setTimeout(() => {
+            storeModal.onOpen();
+          }, 0);
         }
       } catch (error) {
         console.error("Error checking store:", error);
-        // Only open modal if we're sure there are no stores
-        storeModal.onOpen();
       } finally {
         setIsCheckingStore(false);
       }
@@ -77,9 +78,7 @@ export default function SetupLayout({
     );
   }
 
-  return (
-    <>
-      {children}
-    </>
-  );
+  // Don't render anything (including welcome page) when not checking stores
+  // The store modal will be shown automatically when no stores exist
+  return null;
 };

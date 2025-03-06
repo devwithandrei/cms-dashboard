@@ -1,20 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
 import { Store as StoreIcon } from "lucide-react";
-import { useStoreModal } from "@/hooks/use-store-modal";
 
 export default function SetupPage() {
-  const storeModal = useStoreModal();
-  
-  // Open the store modal when the page loads
-  useEffect(() => {
-    // Only open if it's not already open
-    if (!storeModal.isOpen) {
-      storeModal.onOpen();
-    }
-  }, [storeModal]);
-
   return (
     <div className="flex h-full w-full items-center justify-center">
       <div className="flex flex-col items-center gap-y-6">
