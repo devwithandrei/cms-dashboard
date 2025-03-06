@@ -24,10 +24,12 @@ import { DescriptionColumn } from "./columns";
 
 interface CellActionProps {
   data: DescriptionColumn;
+  onDelete?: (id: string) => void;
 }
 
 export const CellAction: React.FC<CellActionProps> = ({
   data,
+  onDelete,
 }) => {
   const router = useRouter();
   const params = useParams();
@@ -42,10 +44,18 @@ export const CellAction: React.FC<CellActionProps> = ({
         return;
       }
       await axios.delete(`/api/${params.storeId}/descriptions/${data.id}`);
+      
+      // Call the onDelete callback to update UI immediately
+      if (onDelete) {
+        onDelete(data.id);
+      }
+      
       toast.success('Description deleted.');
+      
+      // Add a small delay before refreshing to ensure state updates are processed
       setTimeout(() => {
         router.refresh();
-      }, 300);
+      }, 500);
     } catch (error: any) {
       toast.error('Make sure you removed all products using this Description first.');
     } finally {

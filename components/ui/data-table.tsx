@@ -9,6 +9,7 @@ import {
   getFilteredRowModel,
   getPaginationRowModel,
   useReactTable,
+  RowSelectionState,
 } from "@tanstack/react-table";
 
 import {
@@ -23,21 +24,24 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
-interface DataTableProps<TData, TValue> {
+interface DataTableProps<TData extends object, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
   searchKey: string | string[];
   searchPlaceholder?: string;
+  onRowSelectionChange?: (selectedRowIds: string[]) => void;
 }
 
-export function DataTable<TData, TValue>({
+export function DataTable<TData extends object, TValue>({
   columns,
   data,
   searchKey,
   searchPlaceholder = "Search",
+  onRowSelectionChange,
 }: DataTableProps<TData, TValue>) {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = useState<string>("");
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
   const table = useReactTable({
     data,
@@ -46,34 +50,38 @@ export function DataTable<TData, TValue>({
     getPaginationRowModel: getPaginationRowModel(),
     onColumnFiltersChange: setColumnFilters,
     getFilteredRowModel: getFilteredRowModel(),
+    enableRowSelection: true,
+    onRowSelectionChange: (updatedSelection) => {
+      setRowSelection(updatedSelection);
+      if (onRowSelectionChange) {
+        // Handle the selection state properly by ensuring we're working with the actual state object
+        const selectionState = typeof updatedSelection === 'function' 
+          ? updatedSelection(rowSelection)
+          : updatedSelection;
+          
+        const selectedRowIds = Object.entries(selectionState)
+          .filter(([_, selected]) => selected)
+          .map(([key, _]) => {
+            // We know the row exists based on the key
+            const rowData = table.getRow(key).original;
+            // Use type assertion with 'as' to tell TypeScript that we expect an 'id' property
+            // or provide a fallback if it doesn't exist
+            return ('id' in rowData ? String(rowData.id) : key);
+          });
+        onRowSelectionChange(selectedRowIds);
+      }
+    },
     state: {
       columnFilters,
       globalFilter,
+      rowSelection,
     },
     onGlobalFilterChange: setGlobalFilter,
   });
-
-  // Function to handle search across multiple columns
+  
   const handleSearch = (value: string) => {
     setGlobalFilter(value);
-    
-    // If searchKey is an array, apply the filter to all specified columns
-    if (Array.isArray(searchKey)) {
-      searchKey.forEach(key => {
-        const column = table.getColumn(key);
-        if (column) {
-          column.setFilterValue(value);
-        }
-      });
-    } else {
-      // If searchKey is a string, apply the filter to that column
-      const column = table.getColumn(searchKey);
-      if (column) {
-        column.setFilterValue(value);
-      }
-    }
   };
-
   return (
     <div>
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4">

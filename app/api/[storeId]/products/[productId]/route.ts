@@ -243,6 +243,24 @@ export async function DELETE(
       return new NextResponse("Unauthorized", { status: 403, headers: corsHeaders });
     }
 
+    // First delete any OrderItems that reference this product
+    await prismadb.orderItem.deleteMany({
+      where: {
+        productId: params.productId
+      }
+    });
+
+    // Then delete any ProductSize and ProductColor records
+    await prismadb.$transaction([
+      prismadb.productSize.deleteMany({
+        where: { productId: params.productId }
+      }),
+      prismadb.productColor.deleteMany({
+        where: { productId: params.productId }
+      })
+    ]);
+
+    // Finally delete the product
     const product = await prismadb.product.delete({
       where: {
         id: params.productId

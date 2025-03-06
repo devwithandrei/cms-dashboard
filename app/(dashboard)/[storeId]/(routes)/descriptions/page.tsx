@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 
-import prismadb from "@/lib/prismadb";
+import prismadb, { withRetry } from "@/lib/prismadb";
 
 import { DescriptionColumn } from "./components/columns"
 import { DescriptionsClient } from "./components/client";
@@ -14,20 +14,29 @@ const DescriptionsPage = async ({
 }: {
   params: { storeId: string }
 }) => {
-  const descriptions = await prismadb.description.findMany({
+  const descriptions = await withRetry(() => prismadb.description.findMany({
     where: {
       storeId: params.storeId
+    },
+    include: {
+      products: {
+        select: {
+          id: true,
+          name: true
+        }
+      }
     },
     orderBy: {
       createdAt: 'desc'
     }
-  });
+  }), 3, 500);
 
-  const formattedDescriptions: DescriptionColumn[] = descriptions.map((item) => ({
+  const formattedDescriptions: DescriptionColumn[] = descriptions.map((item: any) => ({
     id: item.id,
     name: item.name,
     value: item.value,
     createdAt: format(item.createdAt, 'MMMM do, yyyy'),
+    usedByProducts: item.products,
   }));
 
   return (

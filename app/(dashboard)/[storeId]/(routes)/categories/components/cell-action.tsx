@@ -35,16 +35,25 @@ export const CellAction: React.FC<CellActionProps> = ({
     try {
       setLoading(true);
       if (params && params.storeId) {
+        // Check if category has products before deletion
+        const productsCheck = await axios.get(`/api/${params.storeId}/products?categoryId=${data.id}`);
+        if (productsCheck.data && productsCheck.data.length > 0) {
+          toast.error('Remove all products using this category first.');
+          return;
+        }
+
         await axios.delete(`/api/${params.storeId}/categories/${data.id}`);
         toast.success('Category deleted.');
-        setTimeout(() => {
-          router.refresh();
-        }, 300);
+        router.refresh();
       } else {
         toast.error('Store ID not found.');
       }
-    } catch (error) {
-      toast.error('Make sure you removed all products using this category first.');
+    } catch (error: any) {
+      if (error.response?.status === 409) {
+        toast.error('Category is in use by products.');
+      } else {
+        toast.error('Something went wrong.');
+      }
     } finally {
       setOpen(false);
       setLoading(false);

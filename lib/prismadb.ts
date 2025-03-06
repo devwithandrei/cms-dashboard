@@ -23,7 +23,14 @@ const prismaClientSingleton = () => {
   // For Node.js runtime
   return new PrismaClient({
     log: ['error', 'warn'],
+    datasources: {
+      db: {
+        url: process.env.DATABASE_URL || process.env.DIRECT_URL
+      }
+    },
+    // Add connection timeout settings as part of the client options
   });
+  // Note: connectionTimeout is not a valid direct option for PrismaClient
 };
 
 // In Edge Runtime, we don't use the global singleton pattern
